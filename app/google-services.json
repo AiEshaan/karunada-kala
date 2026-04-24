@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "204635381556",
+    "project_id": "karunada-kala",
+    "storage_bucket": "karunada-kala.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:204635381556:android:0cd157b269db2127998f61",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5nM24-OGoCTqeECC-FL-hprAfOvOMBCE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
