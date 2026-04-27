@@ -1,58 +1,166 @@
 package com.example.myapplication.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.myapplication.data.model.ArtForm
 
 @Composable
 fun ArtCard(
-    name: String,
-    description: String,
-    imageUrl: String,
-    onClick: () -> Unit
+    art: ArtForm,
+    listState: LazyListState,
+    onNavigate: () -> Unit
 ) {
+    var flipped by remember { mutableStateOf(false) }
+    var hasNavigated by remember { mutableStateOf(false) }
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "pressScale")
+
+    val rotation by animateFloatAsState(
+        targetValue = if (flipped) 90f else 0f,
+        animationSpec = tween(
+            durationMillis = 400,
+            easing = FastOutSlowInEasing
+        ),
+        label = "cardFlip"
+    )
+
+    // 🔥 Navigation trigger
+    LaunchedEffect(rotation) {
+        if (rotation >= 89f && !hasNavigated) {
+            hasNavigated = true
+            onNavigate()
+        }
+    }
+    
+    // Reset state when we return to this screen
+    LaunchedEffect(flipped) {
+        if (!flipped) {
+            hasNavigated = false
+        }
+    }
+
+    // Parallax effect logic
+    val offset = try { listState.firstVisibleItemScrollOffset } catch (e: Exception) { 0 }
+    val parallaxTranslation = (offset * 0.03f).coerceAtMost(40f)
+
     Card(
         modifier = Modifier
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            .height(240.dp)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+                rotationY = rotation
+                cameraDistance = 12 * density
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = { flipped = true }
+            ),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(6.dp)
     ) {
-        Column {
+        Box {
+            // 🔥 Background Image with Parallax
             AsyncImage(
-                model = imageUrl,
-                contentDescription = name,
+                model = art.imageUrl,
+                contentDescription = art.name,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-                contentScale = ContentScale.Crop
+                    .fillMaxSize()
+                    .graphicsLayer { translationY = parallaxTranslation },
+                error = coil.compose.AsyncImagePainter.State.Empty.painter,
+                placeholder = coil.compose.AsyncImagePainter.State.Empty.painter
             )
 
-            Column(modifier = Modifier.padding(16.dp)) {
+            // 🌑 Gradient Overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.8f)
+                            )
+                        )
+                    )
+            )
+
+            // 📝 Text Content
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(24.dp)
+            ) {
+                if (art.artistName.isNotEmpty()) {
+                    Text(
+                        text = "Contributing: ${art.artistName}",
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+                
                 Text(
-                    text = name,
+                    text = art.name,
+                    color = Color.White,
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontWeight = FontWeight.Bold
                 )
+
                 Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2
+                    text = art.description,
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1
                 )
+            }
+
+            // 🏷 Category Chip
+            if (art.category.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp),
+                    color = Color(0xFFD4AF37),
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text(
+                        text = art.category,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = Color.Black,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

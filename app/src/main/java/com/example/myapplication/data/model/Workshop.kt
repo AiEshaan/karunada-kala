@@ -3,8 +3,10 @@ package com.example.myapplication.data.model
 data class Workshop(
     val id: String = "",
     val title: String = "",
-    val artistId: String = "",
+    val artistName: String = "",
+    val artType: String = "",
     val date: String = "",
     val fee: String = "",
-    val slots: Int = 0
+    val availableSlots: Int = 0,
+    val imageUrl: String = ""
 )

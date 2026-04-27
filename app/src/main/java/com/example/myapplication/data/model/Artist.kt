@@ -8,5 +8,7 @@ data class Artist(
     val lng: Double = 0.0,
     val phone: String = "",
     val bio: String = "",
-    val photoUrl: String = ""
+    val photoUrl: String = "",
+    val experienceYears: Int = 10,
+    val city: String = "Karnataka" // Added to match Firestore field
 )
