@@ -118,19 +118,6 @@ fun KarunadaKalaApp() {
                         )
                     )
                     NavigationBarItem(
-                        selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.AiGuide.route } == true,
-                        onClick = { navController.navigate(NavRoutes.AiGuide.route) },
-                        icon = { Icon(Icons.Default.Info, contentDescription = "AI Guide") },
-                        label = { Text("AI Guide", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
-                            unselectedIconColor = MaterialTheme.colorScheme.tertiary,
-                            unselectedTextColor = MaterialTheme.colorScheme.tertiary
-                        )
-                    )
-                    NavigationBarItem(
                         selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Journey.route } == true,
                         onClick = { navController.navigate(NavRoutes.Journey.route) },
                         icon = { Icon(Icons.Default.Person, contentDescription = "Journey") },
