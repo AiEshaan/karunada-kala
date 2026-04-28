@@ -19,11 +19,11 @@ import androidx.core.view.WindowCompat
 private val DarkColorScheme = darkColorScheme(
     primary = GoldAccent,
     secondary = PrimaryRed,
-    tertiary = TextPrimary,
-    background = Color(0xFF1C1B1B), // Darker for high contrast
+    tertiary = DeepGold,
+    background = Color(0xFF1C1B1B),
     surface = Color(0xFF2C2C2C),
-    onPrimary = TextPrimary,
-    onSecondary = GoldAccent,
+    onPrimary = Color.Black,
+    onSecondary = Color.White,
     onBackground = WarmBackground,
     onSurface = WarmBackground,
 )
@@ -31,13 +31,14 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryRed,
     secondary = GoldAccent,
-    tertiary = TextSecondary,
+    tertiary = DeepGold,
     background = WarmBackground,
     surface = SoftSurface,
-    onPrimary = WarmBackground,
-    onSecondary = TextPrimary,
+    onPrimary = Color.White,
+    onSecondary = Color.Black,
     onBackground = TextPrimary,
     onSurface = TextPrimary,
+    error = ErrorRed
 )
 
 @Composable

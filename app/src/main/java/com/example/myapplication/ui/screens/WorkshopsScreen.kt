@@ -5,6 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +19,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.ui.components.WorkshopCard
 import com.example.myapplication.ui.components.WorkshopCardShimmer
 import com.example.myapplication.viewmodel.WorkshopViewModel
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,9 +53,14 @@ fun WorkshopsScreen(viewModel: WorkshopViewModel = viewModel()) {
                 title = { 
                     Text(
                         "Learning Sessions", 
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
                     ) 
-                }
+                },
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
             )
         }
     ) { padding ->

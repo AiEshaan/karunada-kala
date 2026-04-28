@@ -10,6 +10,9 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,11 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.myapplication.data.model.ArtForm
 
 @Composable
@@ -30,6 +36,7 @@ fun ArtCard(
     listState: LazyListState,
     onNavigate: () -> Unit
 ) {
+    val context = LocalContext.current
     var flipped by remember { mutableStateOf(false) }
     var hasNavigated by remember { mutableStateOf(false) }
 
@@ -87,14 +94,17 @@ fun ArtCard(
         Box {
             // 🔥 Background Image with Parallax
             AsyncImage(
-                model = art.imageUrl,
+                model = ImageRequest.Builder(context)
+                    .data(art.imageUrl)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = art.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { translationY = parallaxTranslation },
-                error = coil.compose.AsyncImagePainter.State.Empty.painter,
-                placeholder = coil.compose.AsyncImagePainter.State.Empty.painter
+                placeholder = rememberVectorPainter(Icons.Default.Info),
+                error = rememberVectorPainter(Icons.Default.Warning)
             )
 
             // 🌑 Gradient Overlay

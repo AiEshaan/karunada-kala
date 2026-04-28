@@ -152,35 +152,46 @@ fun StatsCard(eventCount: Int, workshopCount: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        elevation = CardDefaults.cardElevation(8.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            StatItem(count = eventCount, label = "Events")
-            Box(modifier = Modifier.height(40.dp).width(1.dp).background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)))
-            StatItem(count = workshopCount, label = "Workshops")
+        Box(modifier = Modifier.background(
+            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+            )
+        )) {
+            Row(
+                modifier = Modifier
+                    .padding(vertical = 32.dp, horizontal = 16.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StatItem(count = eventCount, label = "Events", icon = "🎭")
+                Box(modifier = Modifier.height(50.dp).width(1.dp).background(Color.White.copy(alpha = 0.3f)))
+                StatItem(count = workshopCount, label = "Workshops", icon = "🎨")
+            }
         }
     }
 }
 
 @Composable
-fun StatItem(count: Int, label: String) {
+fun StatItem(count: Int, label: String, icon: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(icon, fontSize = 20.sp)
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = count.toString(),
-            fontSize = 32.sp,
+            fontSize = 36.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
+            color = Color.White
         )
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.7f),
+            letterSpacing = 1.sp
         )
     }
 }
@@ -189,9 +200,10 @@ fun StatItem(count: Int, label: String) {
 fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(bottom = 4.dp)
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.ExtraBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(vertical = 8.dp)
     )
 }
 
@@ -200,41 +212,48 @@ fun JourneyItemCard(title: String, subtitle: String, timestamp: Timestamp?, stat
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        elevation = CardDefaults.cardElevation(1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp, 40.dp)
-                    .background(accentColor, RoundedCornerShape(2.dp))
-            )
+            Surface(
+                modifier = Modifier.size(48.dp),
+                color = accentColor.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(if (status == "Enrolled") "🎨" else "🎭", fontSize = 20.sp)
+                }
+            }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(text = title, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Surface(
-                    color = accentColor.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(8.dp)
+                    color = if (status == "Enrolled") Color(0xFF2E7D32).copy(alpha = 0.1f) else accentColor.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(50)
                 ) {
                     Text(
-                        text = status,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = accentColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+                        text = status.uppercase(),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        color = if (status == "Enrolled") Color(0xFF2E7D32) else accentColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = relativeTime(timestamp), 
                     style = MaterialTheme.typography.labelSmall, 
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.outline,
+                    fontSize = 10.sp
                 )
             }
         }

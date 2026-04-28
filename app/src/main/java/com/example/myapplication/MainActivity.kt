@@ -11,7 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.*
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -19,6 +21,7 @@ import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.ui.screens.*
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.viewmodel.ArtViewModel
+import com.example.myapplication.viewmodel.ChatViewModel
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.firebase.auth.FirebaseAuth
 
@@ -48,50 +51,97 @@ fun KarunadaKalaApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Shared ArtViewModel to track viewed arts across Explore and Detail
+    // Shared ViewModels
     val artViewModel: ArtViewModel = viewModel()
+    val chatViewModel: ChatViewModel = viewModel()
 
     val showBottomBar = currentDestination?.route != NavRoutes.Onboarding.route
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    tonalElevation = 8.dp
+                ) {
                     NavigationBarItem(
                         selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Explore.route } == true,
                         onClick = { navController.navigate(NavRoutes.Explore.route) },
                         icon = { Icon(Icons.Default.Home, contentDescription = "Explore") },
-                        label = { Text("Explore") }
+                        label = { Text("Explore", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            unselectedIconColor = MaterialTheme.colorScheme.tertiary,
+                            unselectedTextColor = MaterialTheme.colorScheme.tertiary
+                        )
                     )
                     NavigationBarItem(
                         selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Map.route } == true,
                         onClick = { navController.navigate(NavRoutes.Map.route) },
                         icon = { Icon(Icons.Default.LocationOn, contentDescription = "Map") },
-                        label = { Text("Map") }
+                        label = { Text("Map", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            unselectedIconColor = MaterialTheme.colorScheme.tertiary,
+                            unselectedTextColor = MaterialTheme.colorScheme.tertiary
+                        )
                     )
                     NavigationBarItem(
                         selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Events.route } == true,
                         onClick = { navController.navigate(NavRoutes.Events.route) },
                         icon = { Icon(Icons.Default.DateRange, contentDescription = "Events") },
-                        label = { Text("Events") }
+                        label = { Text("Events", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            unselectedIconColor = MaterialTheme.colorScheme.tertiary,
+                            unselectedTextColor = MaterialTheme.colorScheme.tertiary
+                        )
                     )
                     NavigationBarItem(
                         selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Workshops.route } == true,
                         onClick = { navController.navigate(NavRoutes.Workshops.route) },
                         icon = { Icon(Icons.Default.Build, contentDescription = "Workshops") },
-                        label = { Text("Workshops") }
+                        label = { Text("Workshops", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            unselectedIconColor = MaterialTheme.colorScheme.tertiary,
+                            unselectedTextColor = MaterialTheme.colorScheme.tertiary
+                        )
                     )
                     NavigationBarItem(
                         selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.AiGuide.route } == true,
                         onClick = { navController.navigate(NavRoutes.AiGuide.route) },
                         icon = { Icon(Icons.Default.Info, contentDescription = "AI Guide") },
-                        label = { Text("AI Guide") }
+                        label = { Text("AI Guide", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            unselectedIconColor = MaterialTheme.colorScheme.tertiary,
+                            unselectedTextColor = MaterialTheme.colorScheme.tertiary
+                        )
                     )
                     NavigationBarItem(
                         selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Journey.route } == true,
                         onClick = { navController.navigate(NavRoutes.Journey.route) },
                         icon = { Icon(Icons.Default.Person, contentDescription = "Journey") },
-                        label = { Text("Journey") }
+                        label = { Text("Journey", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            unselectedIconColor = MaterialTheme.colorScheme.tertiary,
+                            unselectedTextColor = MaterialTheme.colorScheme.tertiary
+                        )
                     )
                 }
             }
@@ -112,7 +162,7 @@ fun KarunadaKalaApp() {
                 })
             }
             composable(NavRoutes.Explore.route) {
-                ExploreScreen(navController, viewModel = artViewModel)
+                ExploreScreen(navController, viewModel = artViewModel, chatViewModel = chatViewModel)
             }
             composable(NavRoutes.Map.route) {
                 MapScreen(navController)
@@ -127,7 +177,7 @@ fun KarunadaKalaApp() {
                 MyJourneyScreen(navController = navController)
             }
             composable(NavRoutes.AiGuide.route) {
-                AiGuideScreen()
+                AiGuideScreen(viewModel = chatViewModel)
             }
             composable(NavRoutes.Detail.route) { backStackEntry ->
                 val name = backStackEntry.arguments?.getString("name") ?: ""

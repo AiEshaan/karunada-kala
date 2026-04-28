@@ -1,8 +1,10 @@
 package com.example.myapplication.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -55,20 +57,35 @@ fun WorkshopCard(
                 }
                 Text(
                     text = "₹${workshop.fee}",
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp
+                    fontSize = 20.sp
                 )
             }
             
             Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = workshop.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("📅", fontSize = 14.sp)
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.DateRange,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = workshop.date,
@@ -78,60 +95,66 @@ fun WorkshopCard(
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
             
-            Column {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Availability",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = "Batch Availability",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${workshop.availableSlots}/10 slots left",
+                        text = "${workshop.availableSlots} seats left",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         color = if (workshop.availableSlots < 3) Color.Red else MaterialTheme.colorScheme.primary
                     )
                 }
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = { workshop.availableSlots / 10f },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
+                        .height(6.dp)
                         .clip(RoundedCornerShape(10.dp)),
-                    color = if (workshop.availableSlots < 3) Color.Red else MaterialTheme.colorScheme.secondary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    color = if (workshop.availableSlots < 3) Color.Red else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = onEnroll,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 enabled = !isEnrolled && !isEnrolling && workshop.availableSlots > 0,
                 shape = RoundedCornerShape(12.dp),
                 colors = if (isEnrolled) {
-                    ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) // Success Green
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 }
             ) {
                 if (isEnrolling) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
                     val buttonText = when {
-                        isEnrolled -> "Enrolled ✓"
-                        workshop.availableSlots <= 0 -> "Sold Out"
-                        else -> "Enroll Now"
+                        isEnrolled -> "Enrolled Successfully ✓"
+                        workshop.availableSlots <= 0 -> "Fully Booked"
+                        else -> "Secure My Spot"
                     }
-                    Text(buttonText, fontWeight = FontWeight.Bold)
+                    Text(buttonText, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }

@@ -4,7 +4,9 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -22,6 +24,7 @@ import com.example.myapplication.data.model.Artist
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.viewmodel.ArtistViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
@@ -56,10 +59,19 @@ fun MapScreen(
             uiSettings = MapUiSettings(zoomControlsEnabled = false)
         ) {
             artistList.forEach { artist ->
+                val markerColor = when (artist.artType) {
+                    "Dance" -> BitmapDescriptorFactory.HUE_RED
+                    "Music" -> BitmapDescriptorFactory.HUE_AZURE
+                    "Craft" -> BitmapDescriptorFactory.HUE_ORANGE
+                    "Painting" -> BitmapDescriptorFactory.HUE_VIOLET
+                    else -> BitmapDescriptorFactory.HUE_YELLOW
+                }
+
                 Marker(
                     state = MarkerState(
                         position = LatLng(artist.lat, artist.lng)
                     ),
+                    icon = BitmapDescriptorFactory.defaultMarker(markerColor),
                     title = artist.name,
                     snippet = artist.artType,
                     onClick = {
@@ -75,17 +87,24 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 80.dp),
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
             shape = RoundedCornerShape(50),
-            tonalElevation = 4.dp
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD4AF37).copy(alpha = 0.5f)),
+            tonalElevation = 8.dp
         ) {
-            Text(
-                text = "${artistList.size} Cultural Guardians nearby",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("🏰", fontSize = 16.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${artistList.size} Cultural Guardians in Karnataka",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
 
         // 🔥 Bottom Sheet Interaction
@@ -120,38 +139,48 @@ fun MapScreen(
                                 Text(
                                     text = artist.artType,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFFD4AF37), // Gold accent
-                                    fontWeight = FontWeight.Medium
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.5.sp
                                 )
                             }
-                            IconButton(onClick = { selectedArtist = null }) {
+                            IconButton(
+                                onClick = { selectedArtist = null },
+                                modifier = Modifier.background(
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                    CircleShape
+                                )
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Close"
+                                    contentDescription = "Close",
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
 
                         if (artist.bio.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = artist.bio,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 3
+                                maxLines = 4,
+                                lineHeight = 20.sp
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
                         Button(
                             onClick = {
                                 navController.navigate(NavRoutes.artistDetail(artist.id))
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
-                            Text("View Artist Profile", fontWeight = FontWeight.Bold)
+                            Text("Explore Art of ${artist.name.split(" ").first()}", fontWeight = FontWeight.ExtraBold)
                         }
                     }
                 }

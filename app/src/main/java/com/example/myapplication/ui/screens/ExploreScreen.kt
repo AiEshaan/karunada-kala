@@ -33,6 +33,7 @@ import com.example.myapplication.data.model.ChatMessage
 import com.example.myapplication.ui.components.ArtCard
 import com.example.myapplication.ui.components.ArtCardShimmer
 import com.example.myapplication.ui.navigation.NavRoutes
+import com.example.myapplication.ui.theme.RoyalRed
 import com.example.myapplication.viewmodel.ArtViewModel
 import com.example.myapplication.viewmodel.ChatViewModel
 import kotlinx.coroutines.delay
@@ -97,12 +98,14 @@ fun ExploreScreen(
                 title = { 
                     Text(
                         "Karunada Kala", 
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.ExtraBold
                     ) 
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         }
@@ -175,8 +178,13 @@ fun ExploreScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(16.dp),
-                                    shape = MaterialTheme.shapes.medium,
-                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+                                    shape = RoundedCornerShape(28.dp),
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f),
+                                        cursorColor = MaterialTheme.colorScheme.primary
+                                    )
                                 )
 
                                 Row(
@@ -189,7 +197,19 @@ fun ExploreScreen(
                                             selected = selectedCategory == category,
                                             onClick = { selectedCategory = category },
                                             label = { Text(category) },
-                                            modifier = Modifier.padding(end = 8.dp)
+                                            modifier = Modifier.padding(end = 8.dp),
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                                selectedLabelColor = Color.White,
+                                                labelColor = MaterialTheme.colorScheme.primary
+                                            ),
+                                            border = FilterChipDefaults.filterChipBorder(
+                                                enabled = true,
+                                                selected = selectedCategory == category,
+                                                borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                                selectedBorderColor = Color.Transparent
+                                            ),
+                                            shape = RoundedCornerShape(12.dp)
                                         )
                                     }
                                 }
@@ -307,7 +327,7 @@ fun HeroSection(offset: Float) {
                     "HERITAGE",
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     color = Color.Black
                 )
             }
@@ -316,7 +336,8 @@ fun HeroSection(offset: Float) {
                 "Discover Karnataka’s Living Heritage",
                 color = Color.White,
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.5).sp
             )
         }
     }

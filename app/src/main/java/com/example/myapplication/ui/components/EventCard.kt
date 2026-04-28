@@ -1,6 +1,7 @@
 package com.example.myapplication.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,17 +44,17 @@ fun EventCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
-                
-                Surface(
-                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(50)
+                                Surface(
+                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(50),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
                 ) {
                     Text(
                         text = artType,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
             }
@@ -61,20 +62,37 @@ fun EventCard(
             Spacer(modifier = Modifier.height(16.dp))
             
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("📅", fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    shape = CircleShape
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("📅", fontSize = 14.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = date,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("📍", fontSize = 14.sp)
-                Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    modifier = Modifier.size(32.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    shape = CircleShape
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("📍", fontSize = 14.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = location,
                     style = MaterialTheme.typography.bodyMedium,
@@ -82,23 +100,26 @@ fun EventCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = onRegister,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 enabled = !isRegistered && !isRegistering,
                 shape = RoundedCornerShape(12.dp),
                 colors = if (isRegistered) {
-                    ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) // Success Green
                 } else {
-                    ButtonDefaults.buttonColors()
+                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 }
             ) {
                 if (isRegistering) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
-                    Text(if (isRegistered) "Registered ✓" else "Register Interest")
+                    Text(
+                        if (isRegistered) "Registered ✓" else "Register Interest",
+                        fontWeight = FontWeight.ExtraBold
+                    )
                 }
             }
         }
