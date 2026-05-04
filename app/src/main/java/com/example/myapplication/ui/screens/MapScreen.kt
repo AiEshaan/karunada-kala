@@ -65,7 +65,7 @@ fun MapScreen(
     val haptic = LocalHapticFeedback.current
     
     val mapItems by mapViewModel.mapItems.collectAsState()
-    val stableItems = remember(mapItems) { mapItems.take(50) }
+    val stableItems = remember(mapItems) { mapItems } // Removed .take(50) to allow all items
     val filterType by mapViewModel.selectedFilter.collectAsState()
     val isLoading by mapViewModel.isLoading.collectAsState()
     val userLocation by mapViewModel.userLocation.collectAsState()
@@ -145,8 +145,9 @@ fun MapScreen(
                         clusterItemContent = { item ->
                             val isDeepLinked = item.lat == initialLat && item.lng == initialLng
 
+                            // FIX: Using Marker instead of AdvancedMarker or complex state to avoid Applier crash
                             Marker(
-                                state = rememberMarkerState(position = item.position),
+                                state = MarkerState(position = item.position),
                                 alpha = if (isDeepLinked) 1.0f else 0.8f,
                                 title = item.itemTitle,
                                 zIndex = if (isDeepLinked) 1.0f else 0.0f
