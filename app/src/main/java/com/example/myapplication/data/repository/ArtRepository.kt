@@ -1,64 +1,82 @@
 package com.example.myapplication.data.repository
 
-import com.example.myapplication.data.model.ArtForm
-import com.example.myapplication.data.model.Artist
-import com.example.myapplication.data.model.Event
-import com.example.myapplication.data.model.Workshop
-import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
+import com.example.myapplication.data.model.*
+import com.google.firebase.firestore.*
 import kotlinx.coroutines.tasks.await
 
 class ArtRepository {
 
     private val db = FirebaseFirestore.getInstance()
+    private val TAG = "ArtRepository"
 
-    suspend fun getArtForms(): List<ArtForm> {
+    private suspend fun <T> fetchCollection(collectionName: String, clazz: Class<T>): Result<List<T>> {
         return try {
-            val snapshot = db.collection("arts").get().await()
-            snapshot.documents.mapNotNull { doc ->
-                doc.toObject(ArtForm::class.java)?.copy(id = doc.id)
-            }
+            val snapshot = db.collection(collectionName).get().await()
+            Result.success(snapshot.toObjects(clazz))
         } catch (e: Exception) {
-            emptyList()
+            Log.e(TAG, "Error fetching collection: $collectionName", e)
+            Result.failure(e)
         }
     }
 
-    suspend fun getArtists(): List<Artist> {
+    suspend fun getArtFormsPaginated(limit: Long, lastDocument: DocumentSnapshot?): Result<Pair<List<ArtForm>, DocumentSnapshot?>> {
         return try {
-            val snapshot = db.collection("artists").get().await()
-            snapshot.documents.mapNotNull { doc ->
-                doc.toObject(Artist::class.java)?.copy(id = doc.id)
+            var query = db.collection("arts")
+                .orderBy("viewCount", Query.Direction.DESCENDING)
+                .limit(limit)
+            
+            if (lastDocument != null) {
+                query = query.startAfter(lastDocument)
             }
+            
+            val snapshot = query.get().await()
+            val items = snapshot.toObjects(ArtForm::class.java)
+            val lastDoc = if (snapshot.documents.isNotEmpty()) snapshot.documents.last() else null
+            Result.success(Pair(items, lastDoc))
         } catch (e: Exception) {
-            emptyList()
+            Log.e(TAG, "Error fetching paginated art forms", e)
+            Result.failure(e)
         }
     }
 
-    suspend fun getEvents(): List<Event> {
-        return try {
-            val snapshot = db.collection("events").get().await()
-            snapshot.documents.mapNotNull { doc ->
-                doc.toObject(Event::class.java)?.copy(id = doc.id)
+    suspend fun incrementViewCount(artName: String) {
+        try {
+            val result = db.collection("arts")
+                .whereEqualTo("name", artName)
+                .get()
+                .await()
+            for (document in result) {
+                db.collection("arts")
+                    .document(document.id)
+                    .update("viewCount", FieldValue.increment(1))
+                    .await()
             }
         } catch (e: Exception) {
-            emptyList()
+            Log.e(TAG, "Error incrementing view count for: $artName", e)
         }
     }
 
-    suspend fun getWorkshops(): List<Workshop> {
-        return try {
-            val snapshot = db.collection("workshops").get().await()
-            snapshot.documents.mapNotNull { doc ->
-                doc.toObject(Workshop::class.java)?.copy(id = doc.id)
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+    suspend fun getArtForms(): Result<List<ArtForm>> {
+        return fetchCollection("arts", ArtForm::class.java)
     }
 
-    suspend fun enrollInWorkshop(workshopId: String, workshopTitle: String, userId: String): Result<Unit> {
+    suspend fun getArtists(): Result<List<Artist>> {
+        return fetchCollection("artists", Artist::class.java)
+    }
+
+    suspend fun getEvents(): Result<List<Event>> {
+        return fetchCollection("events", Event::class.java)
+    }
+
+    suspend fun getWorkshops(): Result<List<Workshop>> {
+        return fetchCollection("workshops", Workshop::class.java)
+    }
+
+    suspend fun enrollInWorkshop(enrollment: Enrollment): Result<Unit> {
         return try {
-            val workshopRef = db.collection("workshops").document(workshopId)
-            val enrollmentRef = db.collection("enrollments").document("${userId}_${workshopId}")
+            val workshopRef = db.collection("workshops").document(enrollment.workshopId)
+            val enrollmentRef = db.collection("enrollments").document("${enrollment.userId}_${enrollment.workshopId}")
 
             db.runTransaction { transaction ->
                 val workshopSnapshot = transaction.get(workshopRef)
@@ -77,16 +95,11 @@ class ArtRepository {
                 transaction.update(workshopRef, "availableSlots", availableSlots - 1)
 
                 // 2. Create enrollment record
-                val enrollmentData = hashMapOf(
-                    "userId" to userId,
-                    "workshopId" to workshopId,
-                    "workshopTitle" to workshopTitle,
-                    "timestamp" to com.google.firebase.Timestamp.now()
-                )
-                transaction.set(enrollmentRef, enrollmentData)
+                transaction.set(enrollmentRef, enrollment)
             }.await()
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "Error enrolling in workshop: ${enrollment.workshopId}", e)
             Result.failure(e)
         }
     }
@@ -97,6 +110,7 @@ class ArtRepository {
             val snapshot = enrollmentRef.get().await()
             snapshot.exists()
         } catch (e: Exception) {
+            Log.e(TAG, "Error checking enrollment for workshop: $workshopId", e)
             false
         }
     }
@@ -109,38 +123,68 @@ class ArtRepository {
                 .get().await()
             !snapshot.isEmpty
         } catch (e: Exception) {
+            Log.e(TAG, "Error checking registration for event: $eventTitle", e)
             false
         }
     }
 
-    suspend fun registerForEvent(registration: Map<String, Any>): Result<Unit> {
+    suspend fun registerForEvent(registration: Registration): Result<Unit> {
         return try {
             db.collection("registrations").add(registration).await()
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "Error registering for event: ${registration.eventTitle}", e)
             Result.failure(e)
         }
     }
 
-    suspend fun getUserRegistrations(userId: String): List<Map<String, Any>> {
+    suspend fun getUserRegistrations(userId: String): Result<List<Registration>> {
         return try {
             val snapshot = db.collection("registrations")
                 .whereEqualTo("userId", userId)
                 .get().await()
-            snapshot.documents.map { it.data ?: emptyMap() }
+            Result.success(snapshot.toObjects(Registration::class.java))
         } catch (e: Exception) {
-            emptyList()
+            Log.e(TAG, "Error fetching user registrations: $userId", e)
+            Result.failure(e)
         }
     }
 
-    suspend fun getUserEnrollments(userId: String): List<Map<String, Any>> {
+    suspend fun getUserEnrollments(userId: String): Result<List<Enrollment>> {
         return try {
             val snapshot = db.collection("enrollments")
                 .whereEqualTo("userId", userId)
                 .get().await()
-            snapshot.documents.map { it.data ?: emptyMap() }
+            Result.success(snapshot.toObjects(Enrollment::class.java))
         } catch (e: Exception) {
-            emptyList()
+            Log.e(TAG, "Error fetching user enrollments: $userId", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getArtistById(artistId: String): Result<Artist?> {
+        return try {
+            val doc = db.collection("artists")
+                .document(artistId)
+                .get()
+                .await()
+            Result.success(if (doc.exists()) doc.toObject(Artist::class.java) else null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching artist by ID: $artistId", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getArtistByName(name: String): Result<Artist?> {
+        return try {
+            val result = db.collection("artists")
+                .whereEqualTo("name", name)
+                .get()
+                .await()
+            Result.success(if (!result.isEmpty) result.documents[0].toObject(Artist::class.java) else null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching artist by name: $name", e)
+            Result.failure(e)
         }
     }
 }

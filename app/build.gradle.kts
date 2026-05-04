@@ -63,17 +63,22 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.google.material)
     
     // Maps
     implementation(libs.maps.compose)
+    implementation(libs.maps.utils)
     implementation(libs.play.services.maps)
+    implementation(libs.play.services.location)
 
     // Firebase
     implementation(platform(libs.androidx.compose.bom)) // BOM for Compose is already there, check Firebase BOM
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
+    implementation(libs.firebase.storage)
+    implementation(libs.firebase.messaging)
     implementation(libs.firebase.analytics)
     implementation(libs.kotlinx.coroutines.play.services)
 
@@ -89,6 +94,16 @@ dependencies {
 
     // Shimmer
     implementation(libs.compose.shimmer)
+
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+
+    // Media3
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+    
+    // QR Code
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

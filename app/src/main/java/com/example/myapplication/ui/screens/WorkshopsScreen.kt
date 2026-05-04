@@ -16,22 +16,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.example.myapplication.ui.components.ReceiptDialog
+import com.example.myapplication.ui.components.UiStateHandler
 import com.example.myapplication.ui.components.WorkshopCard
 import com.example.myapplication.ui.components.WorkshopCardShimmer
+import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.viewmodel.WorkshopViewModel
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkshopsScreen(viewModel: WorkshopViewModel = viewModel()) {
+fun WorkshopsScreen(navController: NavController, viewModel: WorkshopViewModel = viewModel()) {
 
-    val workshopList by viewModel.workshops.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     val enrollmentStatus by viewModel.enrollmentStatus.collectAsState()
     val isEnrolling by viewModel.isEnrolling.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
     val uiEvent by viewModel.uiEvent.collectAsState()
+    val lastEnrolled by viewModel.lastEnrolledWorkshop.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -65,32 +68,28 @@ fun WorkshopsScreen(viewModel: WorkshopViewModel = viewModel()) {
         }
     ) { padding ->
 
-        AnimatedContent(
-            targetState = isLoading,
-            label = "workshopShimmerTransition",
-            modifier = Modifier.padding(padding),
-            transitionSpec = {
-                fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
-            }
-        ) { loading ->
-            if (loading) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(5) {
-                        WorkshopCardShimmer()
+        Box(modifier = Modifier.padding(padding)) {
+            UiStateHandler(
+                uiState = uiState,
+                onRetry = { viewModel.fetchWorkshops() },
+                loadingContent = {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(5) { WorkshopCardShimmer() }
                     }
+                },
+                emptyContent = {
+                    com.example.myapplication.ui.components.DefaultEmptyState(
+                        icon = "🎨",
+                        title = "No workshops available",
+                        description = "Check back soon for new learning sessions!"
+                    )
                 }
-            } else if (workshopList.isEmpty()) {
-                EmptyState(
-                    icon = "🎨",
-                    title = "No workshops available",
-                    description = "Check back soon for new learning sessions!"
-                )
-            } else {
+            ) { workshops ->
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
-                    itemsIndexed(workshopList, key = { _, workshop -> workshop.id }) { index, workshop ->
+                    itemsIndexed(workshops, key = { _, workshop -> workshop.id }) { index, workshop ->
                         val shouldAnimate = index < 10
                         var visible by remember { mutableStateOf(!shouldAnimate) }
                         
@@ -117,6 +116,14 @@ fun WorkshopsScreen(viewModel: WorkshopViewModel = viewModel()) {
                     }
                 }
             }
+        }
+
+        lastEnrolled?.let { workshop ->
+            ReceiptDialog(
+                title = workshop.title,
+                date = workshop.date,
+                onDismiss = { viewModel.clearEnrollmentState() }
+            )
         }
     }
 }

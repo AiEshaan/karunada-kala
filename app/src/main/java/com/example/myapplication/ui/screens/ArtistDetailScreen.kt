@@ -3,6 +3,7 @@ package com.example.myapplication.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -38,6 +43,7 @@ fun ArtistDetailScreen(
 ) {
     val viewModel: ArtistViewModel = viewModel()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val artist by viewModel.selectedArtist.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
 
@@ -183,8 +189,12 @@ fun ArtistDetailScreen(
                         Spacer(modifier = Modifier.height(40.dp))
 
                         // 📲 CONTACT FAB-STYLE BUTTON
+                        var isPressed by remember { mutableStateOf(false) }
+                        val scale by animateFloatAsState(if (isPressed) 0.95f else 1f)
+
                         Button(
                             onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 val url = "https://wa.me/${currentArtist.phone}"
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                 context.startActivity(intent)
@@ -192,7 +202,20 @@ fun ArtistDetailScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 24.dp)
-                                .height(56.dp),
+                                .height(56.dp)
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            isPressed = true
+                                            tryAwaitRelease()
+                                            isPressed = false
+                                        }
+                                    )
+                                },
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {

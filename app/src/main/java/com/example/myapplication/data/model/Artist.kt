@@ -1,14 +1,18 @@
 package com.example.myapplication.data.model
 
+import com.google.firebase.firestore.DocumentId
+
 data class Artist(
-    val id: String = "",
+    @DocumentId override val id: String = "",
     val name: String = "",
     val artType: String = "",
-    val lat: Double = 0.0,
-    val lng: Double = 0.0,
+    override val lat: Double = 0.0,
+    override val lng: Double = 0.0,
     val phone: String = "",
     val bio: String = "",
     val photoUrl: String = "",
     val experienceYears: Int = 10,
-    val city: String = "Karnataka" // Added to match Firestore field
-)
+    val city: String = "Karnataka",
+    val guruName: String = "Traditional Master",
+    val studentsDescription: String = "Next Generation Apprentices"
+) : MapEntity

@@ -48,7 +48,7 @@ fun OnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF8B0000)), // Deep Red
+            .background(MaterialTheme.colorScheme.background),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -71,17 +71,18 @@ fun OnboardingScreen(
 
                 Text(
                     text = pages[page].title,
-                    color = Color(0xFFD4AF37), // Gold
-                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    lineHeight = 44.sp
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
                     text = pages[page].description,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyLarge,
                     lineHeight = 24.sp
@@ -101,14 +102,14 @@ fun OnboardingScreen(
                 modifier = Modifier.padding(bottom = 32.dp)
             ) {
                 repeat(pages.size) { index ->
-                    val color = if (pagerState.currentPage == index) Color(0xFFD4AF37) else Color.White.copy(alpha = 0.3f)
+                    val color = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                     val width = if (pagerState.currentPage == index) 24.dp else 8.dp
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)
-                            .height(8.dp)
+                            .height(4.dp)
                             .width(width)
-                            .background(color, CircleShape)
+                            .background(color, RoundedCornerShape(2.dp))
                     )
                 }
             }
@@ -128,15 +129,16 @@ fun OnboardingScreen(
                     .padding(horizontal = 32.dp)
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFD4AF37)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = if (pagerState.currentPage == pages.size - 1) "Get Started" else "Continue",
-                    color = Color.Black,
+                    text = if (pagerState.currentPage == pages.size - 1) "ENTER THE SANGHA" else "NEXT",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    fontSize = 14.sp,
+                    letterSpacing = 1.sp
                 )
             }
         }

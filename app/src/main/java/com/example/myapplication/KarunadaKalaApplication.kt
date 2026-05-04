@@ -6,7 +6,11 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.request.CachePolicy
 import coil.util.DebugLogger
+import com.google.android.gms.maps.MapsInitializer
 import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.google.firebase.firestore.PersistentCacheSettings
 import okhttp3.OkHttpClient
 
 class KarunadaKalaApplication : Application(), ImageLoaderFactory {
@@ -14,7 +18,20 @@ class KarunadaKalaApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         // Initialize Firebase
         FirebaseApp.initializeApp(this)
-        Log.d("KarunadaKala", "Firebase initialized successfully.")
+        
+        // Initialize Google Maps SDK to prevent IBitmapDescriptorFactory not initialized crash
+        MapsInitializer.initialize(this, MapsInitializer.Renderer.LATEST) { renderer ->
+            when (renderer) {
+                MapsInitializer.Renderer.LATEST -> Log.d("MapsInit", "The latest version of the renderer is used.")
+                MapsInitializer.Renderer.LEGACY -> Log.d("MapsInit", "The legacy version of the renderer is used.")
+            }
+        }
+        
+        // Enable Firestore Offline Persistence for a "Pass" like experience
+        val settings = FirebaseFirestoreSettings.Builder()
+            .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
+            .build()
+        FirebaseFirestore.getInstance().setFirestoreSettings(settings)
     }
 
     override fun newImageLoader(): ImageLoader {
@@ -23,16 +40,16 @@ class KarunadaKalaApplication : Application(), ImageLoaderFactory {
                 OkHttpClient.Builder()
                     .addInterceptor { chain ->
                         val request = chain.request().newBuilder()
-                            .header("User-Agent", "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36")
+                            .header("User-Agent", "KarunadaKala/1.0 (https://example.com; contact@example.com) Coil/2.7.0")
                             .build()
                         chain.proceed(request)
                     }
                     .build()
             }
-            .crossfade(true)
+            .crossfade(600) // Slightly longer for premium feel
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .logger(DebugLogger())
+            .respectCacheHeaders(false) // Cache images even if headers say otherwise (good for art images)
             .build()
     }
 }

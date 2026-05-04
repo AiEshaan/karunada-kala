@@ -4,15 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.Artist
 import com.example.myapplication.data.repository.ArtRepository
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 class ArtistViewModel : ViewModel() {
 
-    private val firestore = FirebaseFirestore.getInstance()
     private val repository = ArtRepository()
 
     private val _selectedArtist = MutableStateFlow<Artist?>(null)
@@ -24,20 +21,21 @@ class ArtistViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
     fun loadArtist(name: String) {
         viewModelScope.launch {
             _selectedArtist.value = null // Reset state before loading new artist
             _isLoading.value = true
-            try {
-                val result = firestore.collection("artists")
-                    .whereEqualTo("name", name)
-                    .get()
-                    .await()
-                if (!result.isEmpty) {
-                    _selectedArtist.value = result.documents[0].toObject(Artist::class.java)
+            _error.value = null
+            repository.getArtistByName(name).onSuccess { artist ->
+                _selectedArtist.value = artist
+                if (artist == null) {
+                    _error.value = "Artist not found"
                 }
-            } catch (e: Exception) {
-                // Handle error
+            }.onFailure { e ->
+                _error.value = "Failed to load artist story: ${e.message}"
             }
             _isLoading.value = false
         }
@@ -47,16 +45,14 @@ class ArtistViewModel : ViewModel() {
         viewModelScope.launch {
             _selectedArtist.value = null
             _isLoading.value = true
-            try {
-                val doc = firestore.collection("artists")
-                    .document(artistId)
-                    .get()
-                    .await()
-                if (doc.exists()) {
-                    _selectedArtist.value = doc.toObject(Artist::class.java)
+            _error.value = null
+            repository.getArtistById(artistId).onSuccess { artist ->
+                _selectedArtist.value = artist
+                if (artist == null) {
+                    _error.value = "Artist not found"
                 }
-            } catch (e: Exception) {
-                // Handle error
+            }.onFailure { e ->
+                _error.value = "Failed to load artist story: ${e.message}"
             }
             _isLoading.value = false
         }
@@ -65,8 +61,12 @@ class ArtistViewModel : ViewModel() {
     fun fetchArtists() {
         viewModelScope.launch {
             _isLoading.value = true
-            val result = repository.getArtists()
-            _artists.value = result
+            _error.value = null
+            repository.getArtists().onSuccess { result ->
+                _artists.value = result
+            }.onFailure { e ->
+                _error.value = "Failed to load cultural map: ${e.message}"
+            }
             _isLoading.value = false
         }
     }

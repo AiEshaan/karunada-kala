@@ -1,14 +1,18 @@
 package com.example.myapplication.data.repository
 
+import android.graphics.Bitmap
 import android.util.Log
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.Content
+import com.google.ai.client.generativeai.type.content
 import com.example.myapplication.BuildConfig
 import com.example.myapplication.data.model.ArtRecommendation
 
 class GeminiRepository {
 
+    private val TAG = "GeminiRepository"
+
     init {
-        Log.d("GEMINI_INIT", "API Key length: ${BuildConfig.GEMINI_API_KEY.length}")
     }
 
     private val model = GenerativeModel(
@@ -16,21 +20,22 @@ class GeminiRepository {
         apiKey = BuildConfig.GEMINI_API_KEY
     )
 
-    suspend fun generateText(prompt: String): String {
+    suspend fun generateText(prompt: String): Result<String> {
         return try {
             val response = model.generateContent(prompt)
-            response.text ?: "I'm sorry, I couldn't generate a response. Please try asking about Karnataka's culture!"
+            val text = response.text
+            if (text != null) Result.success(text) else Result.failure(Exception("AI returned null response"))
         } catch (e: Exception) {
-            e.printStackTrace()
-            "Namaskara! I'm experiencing a small technical issue. Please check your internet and try again."
+            Log.e(TAG, "Error generating text", e)
+            Result.failure(e)
         }
     }
 
     suspend fun generateRecommendations(
         viewedArts: List<String>,
         allArts: List<String>
-    ): List<ArtRecommendation> {
-        if (viewedArts.isEmpty()) return emptyList()
+    ): Result<List<ArtRecommendation>> {
+        if (viewedArts.isEmpty()) return Result.success(emptyList())
         
         return try {
             val prompt = """
@@ -49,59 +54,98 @@ class GeminiRepository {
             // Simple parsing using Regex to be safe
             val regex = """\{"name"\s*:\s*"(.*?)",\s*"reason"\s*:\s*"(.*?)"\}""".toRegex()
             
-            regex.findAll(response).map {
+            val recommendations = regex.findAll(response).map {
                 ArtRecommendation(
                     name = it.groupValues[1],
                     reason = it.groupValues[2]
                 )
             }.toList()
-
+            
+            Result.success(recommendations)
         } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+            Log.e(TAG, "Error generating recommendations", e)
+            Result.failure(e)
         }
     }
 
-    suspend fun askKala(userMessage: String): String {
-        // Mock responses for known suggestions to bypass API issues during development
-        when {
-            userMessage.contains("Yakshagana", ignoreCase = true) -> return "Yakshagana is a traditional theater form from Karnataka that combines dance, music, dialogue, costume, make-up, and stage techniques with a unique style and form. It is traditionally performed in the coastal districts and Malenadu regions of Karnataka."
-            userMessage.contains("Mysore Dasara", ignoreCase = true) -> return "Mysore Dasara is the state festival of Karnataka. It is a 10-day festival, culminating with Vijayadashami. The festival features a grand procession of decorated elephants, with the lead elephant carrying the Golden Howdah containing the idol of Goddess Chamundeshwari."
-            userMessage.contains("Hampi", ignoreCase = true) -> return "Hampi is a UNESCO World Heritage site featuring the ruins of the Vijayanagara Empire. Famous temples include the Virupaksha Temple, Vitthala Temple (famous for its stone chariot), and the Hazara Rama Temple."
-            userMessage.contains("food", ignoreCase = true) -> return "Karnataka's cuisine is diverse. Must-try dishes include Bisi Bele Bath, Davanagere Benne Dosa, Mysore Pak, Akki Roti, and the coastal specialty Neer Dosa with Gassi."
+    suspend fun askKala(userMessage: String, context: String = "", history: List<Content> = emptyList()): Result<String> {
+        // Optimized history (Keep last 4 messages to save tokens and stay within limits)
+        val optimizedHistory = if (history.size > 4) history.takeLast(4) else history
+        
+        // Standardized responses for common historical topics
+        if (context.isEmpty() && optimizedHistory.isEmpty()) {
+            when {
+                userMessage.contains("Yakshagana", ignoreCase = true) -> return Result.success("Yakshagana is a traditional theater form from Karnataka that combines dance, music, dialogue, costume, make-up, and stage techniques with a unique style and form. It is traditionally performed in the coastal districts and Malenadu regions of Karnataka.")
+                userMessage.contains("Mysore Dasara", ignoreCase = true) -> return Result.success("Mysore Dasara is the state festival of Karnataka. It is a 10-day festival, culminating with Vijayadashami. The festival features a grand procession of decorated elephants, with the lead elephant carrying the Golden Howdah containing the idol of Goddess Chamundeshwari.")
+                userMessage.contains("Hampi", ignoreCase = true) -> return Result.success("Hampi is a UNESCO World Heritage site featuring the ruins of the Vijayanagara Empire. Famous temples include the Virupaksha Temple, Vitthala Temple (famous for its stone chariot), and the Hazara Rama Temple.")
+                userMessage.contains("food", ignoreCase = true) -> return Result.success("Karnataka's cuisine is diverse. Must-try dishes include Bisi Bele Bath, Davanagere Benne Dosa, Mysore Pak, Akki Roti, and the coastal specialty Neer Dosa with Gassi.")
+            }
         }
 
         return try {
-            val prompt = """
-            You are Kala, a friendly and knowledgeable cultural guide specialized in the heritage of Karnataka, India.
+            val chat = model.startChat(optimizedHistory)
+            val systemPrompt = """
+            You are Kala, a friendly and wise cultural guide specialized in the heritage of Karnataka, India.
             
-            Your personality:
-            - Engaging, respectful, and passionate about Karnataka's art, traditions, and history.
-            - You use occasional Kannada greetings like 'Namaskara'.
+            Current App Context: $context
             
-            Scope:
-            - Answer ONLY questions related to Karnataka's art forms (Yakshagana, Dollu Kunitha, etc.), festivals, artists, history, and cultural traditions.
-            - If a user asks something completely unrelated to Karnataka's culture, politely inform them that you are specialized in Karnataka's heritage and suggest they ask a cultural question.
+            Personality:
+            - Engaging, respectful, and passionate.
+            - Useoccasional Kannada greetings like 'Namaskara'.
+            - Answer like a knowledgeable elder sharing wisdom.
             
-            Keep your answers concise, informative, and formatted for easy reading.
-            
-            User question:
-            $userMessage
+            Guidelines:
+            - Answer ONLY questions related to Karnataka's culture, art, history, food, and traditions.
+            - If unrelated, politely redirect the user back to Karnataka's heritage.
+            - If asked "tell me more", refer to the previous topic discussed in the history or context.
+            - Keep answers concise, formatted with bullet points if needed.
             """
 
-            val response = model.generateContent(prompt)
-            response.text ?: "I'm having trouble finding an answer right now. Please try asking another cultural question!"
-
+            val response = chat.sendMessage(content {
+                text("$systemPrompt\n\nUser: $userMessage")
+            })
+            val text = response.text
+            if (text != null) Result.success(text) else Result.failure(Exception("Kala returned null response"))
         } catch (e: Exception) {
-            e.printStackTrace()
-            "Namaskara! I'm having a small technical issue with my cultural database (Gemini API 404). Please try one of the suggested topics or check back soon!"
+            Log.e(TAG, "Error asking Kala", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun analyzeHeritageImage(bitmap: Bitmap): Result<String> {
+        return try {
+            val prompt = """
+            You are 'Kala Vision'. Analyze this image. 
+            Identify if it shows any Karnataka cultural heritage (monuments, art forms, crafts, textiles, food).
+            
+            If it is related to Karnataka culture:
+            1. Identify it.
+            2. Explain its significance.
+            3. Mention where in Karnataka it can be found.
+            
+            If it is NOT related to Karnataka culture, politely say you are specialized in Karnataka's heritage and can't identify this.
+            
+            Keep the response under 100 words.
+            """
+            
+            val inputContent = content {
+                image(bitmap)
+                text(prompt)
+            }
+            
+            val response = model.generateContent(inputContent)
+            val text = response.text
+            if (text != null) Result.success(text) else Result.failure(Exception("Kala Vision returned null response"))
+        } catch (e: Exception) {
+            Log.e(TAG, "Error analyzing heritage image", e)
+            Result.failure(e)
         }
     }
 
     suspend fun generateArtDescription(
         artName: String,
         category: String
-    ): String {
+    ): Result<String> {
         return try {
             val prompt = """
             Write a short, engaging description of $artName,
@@ -116,11 +160,29 @@ class GeminiRepository {
             """
 
             val response = model.generateContent(prompt)
-            response.text ?: "No description available"
-
+            val text = response.text
+            if (text != null) Result.success(text) else Result.failure(Exception("Art description generation failed"))
         } catch (e: Exception) {
-            e.printStackTrace()
-            "Error generating description"
+            Log.e(TAG, "Error generating art description for: $artName", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun generatePersonalizedLegend(artName: String): Result<String> {
+        return try {
+            val prompt = """
+            You are Kala, a wise cultural storyteller. Create a short, poetic "legend" or mythical backstory for $artName.
+            Start with "It is said that..."
+            Make it feel ancient, immersive, and like a story passed down through generations.
+            Focus on the emotional and spiritual essence of the art.
+            Limit to 3 sentences.
+            """
+            val response = model.generateContent(prompt)
+            val text = response.text
+            if (text != null) Result.success(text) else Result.failure(Exception("Legend generation failed"))
+        } catch (e: Exception) {
+            Log.e(TAG, "Error generating legend for: $artName", e)
+            Result.failure(e)
         }
     }
 }

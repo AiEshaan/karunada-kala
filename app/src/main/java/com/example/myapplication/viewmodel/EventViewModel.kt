@@ -3,6 +3,8 @@ package com.example.myapplication.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.Event
+import com.example.myapplication.data.model.Registration
+import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.data.repository.ArtRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,35 +20,35 @@ class EventViewModel : ViewModel() {
     private val _events = MutableStateFlow<List<Event>>(emptyList())
     val events: StateFlow<List<Event>> = _events
 
+    private val _uiState = MutableStateFlow<UiState<List<Event>>>(UiState.Idle)
+    val uiState: StateFlow<UiState<List<Event>>> = _uiState
+
     private val _registrationStatus = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     val registrationStatus: StateFlow<Map<String, Boolean>> = _registrationStatus
 
     private val _isRegistering = MutableStateFlow(false)
     val isRegistering: StateFlow<Boolean> = _isRegistering
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+    private val _registrationUiState = MutableStateFlow<UiState<String>>(UiState.Idle)
+    val registrationUiState: StateFlow<UiState<String>> = _registrationUiState
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
     fun fetchEvents() {
         viewModelScope.launch {
-            _isLoading.value = true
+            _uiState.value = UiState.Loading
             _error.value = null
-            try {
-                val list = repository.getEvents()
-                if (list.isEmpty()) {
-                    // Handled by UI empty state, but could set error if unexpected
-                }
+            repository.getEvents().onSuccess { list ->
                 _events.value = list
                 list.forEach { event ->
                     checkRegistration(event.title)
                 }
-            } catch (e: Exception) {
+                _uiState.value = UiState.Success(list)
+            }.onFailure { e ->
                 _error.value = "Failed to load events. Please check your connection."
+                _uiState.value = UiState.Error(_error.value!!)
             }
-            _isLoading.value = false
         }
     }
 
@@ -58,7 +60,7 @@ class EventViewModel : ViewModel() {
                     _registrationStatus.value = _registrationStatus.value + (eventTitle to true)
                 }
             } catch (e: Exception) {
-                // Silent fail for status check
+                // Check registration status; failures are non-critical here
             }
         }
     }
@@ -68,23 +70,35 @@ class EventViewModel : ViewModel() {
         
         viewModelScope.launch {
             _isRegistering.value = true
-            val registration = hashMapOf(
-                "userId" to userId,
-                "eventTitle" to event.title,
-                "artType" to event.artType,
-                "date" to event.date,
-                "timestamp" to com.google.firebase.Timestamp.now(),
-                "status" to "Interested"
+            _registrationUiState.value = UiState.Loading
+            val registration = Registration(
+                userId = userId,
+                eventTitle = event.title,
+                artType = event.artType,
+                timestamp = com.google.firebase.Timestamp.now(),
+                status = "Interested"
             )
-            val result = repository.registerForEvent(registration)
-            if (result.isSuccess) {
+            repository.registerForEvent(registration).onSuccess {
                 _registrationStatus.value = _registrationStatus.value + (event.title to true)
-                _error.value = "Registered for ${event.title}!"
-            } else {
-                _error.value = "Registration failed. Try again later."
+                val successMsg = "Added to your Journey 📜! (${event.title})"
+                _error.value = successMsg
+                _registrationUiState.value = UiState.Success(successMsg)
+            }.onFailure { e ->
+                val errorMsg = "Registration failed. Try again later."
+                _error.value = errorMsg
+                _registrationUiState.value = UiState.Error(errorMsg)
             }
             _isRegistering.value = false
         }
+    }
+
+    fun clearRegistrationState() {
+        _registrationUiState.value = UiState.Idle
+    }
+
+    fun getEventCoordinates(eventTitle: String): Pair<Double, Double>? {
+        val event = _events.value.find { it.title == eventTitle }
+        return if (event != null) Pair(event.lat, event.lng) else null
     }
 
     fun clearError() {

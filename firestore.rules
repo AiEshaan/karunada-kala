@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Core collections: Read-only for everyone
+    match /arts/{artId} {
+      allow read: if true;
+      allow write: if false; // Only admin via console/SDK
+    }
+
+    match /artists/{artistId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /workshops/{workshopId} {
+      allow read: if true;
+      allow write: if request.auth != null; // For slot updates via transaction
+    }
+
+    // Community Posts: Read for all, Create for auth, Edit/Delete for owner
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+
+      // Nested comments
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if request.auth != null;
+      }
+    }
+
+    // User Data & Journey: Private to user
+    match /registrations/{regId} {
+      allow read, create: if request.auth != null && (request.auth.uid == request.resource.data.userId || request.auth.uid == resource.data.userId);
+    }
+
+    match /enrollments/{enrolId} {
+      allow read, create: if request.auth != null && (request.auth.uid == request.resource.data.userId || request.auth.uid == resource.data.userId);
+    }
+
+    // Reports: Write-only for users (privacy for whistleblower)
+    match /reports/{reportId} {
+      allow create: if request.auth != null;
+      allow read: if false; // Only admin can see reports
+    }
+  }
+}
