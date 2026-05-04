@@ -4,7 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.util.Log
+
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,7 +45,7 @@ import com.example.myapplication.viewmodel.EventViewModel
 import com.example.myapplication.viewmodel.MapViewModel
 import com.example.myapplication.viewmodel.WorkshopViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
+
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
@@ -133,7 +133,7 @@ fun MapScreen(
             onMapClick = { selectedItem = null },
             uiSettings = MapUiSettings(zoomControlsEnabled = false)
         ) {
-            if (isMapInitialized) {
+            if (isMapInitialized && stableItems.isNotEmpty()) {
                 key(stableItems.size) {
                     Clustering(
                         items = stableItems,
@@ -142,16 +142,40 @@ fun MapScreen(
                             selectedItem = item
                             true
                         },
+                        // clusterItemContent renders visual content that gets converted to a marker bitmap.
+                        // Do NOT put Marker() composables here — that causes "Invalid applier" crash.
                         clusterItemContent = { item ->
                             val isDeepLinked = item.lat == initialLat && item.lng == initialLng
+                            val markerColor = when (item.type) {
+                                "Artists" -> Color(0xFF8B4513)   // Warm brown
+                                "Events" -> Color(0xFFD4AF37)    // Gold
+                                "Workshops" -> Color(0xFF008080) // Teal
+                                else -> MaterialTheme.colorScheme.primary
+                            }
+                            val emoji = when (item.type) {
+                                "Artists" -> "🎭"
+                                "Events" -> "🎪"
+                                "Workshops" -> "🧑‍🏫"
+                                else -> "📍"
+                            }
 
-                            // FIX: Using Marker instead of AdvancedMarker or complex state to avoid Applier crash
-                            Marker(
-                                state = MarkerState(position = item.position),
-                                alpha = if (isDeepLinked) 1.0f else 0.8f,
-                                title = item.itemTitle,
-                                zIndex = if (isDeepLinked) 1.0f else 0.0f
-                            )
+                            Surface(
+                                modifier = Modifier.size(if (isDeepLinked) 44.dp else 36.dp),
+                                shape = CircleShape,
+                                color = markerColor,
+                                tonalElevation = if (isDeepLinked) 12.dp else 4.dp,
+                                border = BorderStroke(
+                                    if (isDeepLinked) 3.dp else 2.dp,
+                                    Color.White
+                                )
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(emoji, fontSize = if (isDeepLinked) 18.sp else 14.sp)
+                                }
+                            }
                         },
                         clusterContent = { cluster ->
                             val clusterSize = cluster.items.size
