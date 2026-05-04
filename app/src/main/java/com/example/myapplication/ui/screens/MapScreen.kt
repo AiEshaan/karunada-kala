@@ -114,11 +114,6 @@ fun MapScreen(
     // 💡 Icons moved to be initialized safely inside GoogleMap or using a state that checks for initialization
     var isMapInitialized by remember { mutableStateOf(false) }
     
-    val artistIcon = remember(isMapInitialized) { if (isMapInitialized) BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED) else null }
-    val eventIcon = remember(isMapInitialized) { if (isMapInitialized) BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE) else null }
-    val workshopIcon = remember(isMapInitialized) { if (isMapInitialized) BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE) else null }
-    val defaultIcon = remember(isMapInitialized) { if (isMapInitialized) BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_YELLOW) else null }
-
     LaunchedEffect(Unit) {
         mapViewModel.fetchData()
         val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -149,16 +144,9 @@ fun MapScreen(
                         },
                         clusterItemContent = { item ->
                             val isDeepLinked = item.lat == initialLat && item.lng == initialLng
-                            val markerIcon = when (item.type) {
-                                "Artists" -> artistIcon
-                                "Events" -> eventIcon
-                                "Workshops" -> workshopIcon
-                                else -> defaultIcon
-                            }
 
                             Marker(
                                 state = rememberMarkerState(position = item.position),
-                                icon = markerIcon,
                                 alpha = if (isDeepLinked) 1.0f else 0.8f,
                                 title = item.itemTitle,
                                 zIndex = if (isDeepLinked) 1.0f else 0.0f

@@ -9,7 +9,7 @@ data class Workshop(
     val artistName: String = "",
     val artType: String = "",
     val date: String = "",
-    val fee: String = "",
+    val fee: Any = 0L, // Changed from String to Any to handle Long/String from Firestore
     val availableSlots: Int = 0,
     val imageUrl: String = "",
     override val lat: Double = 0.0,
