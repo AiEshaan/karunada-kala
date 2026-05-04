@@ -13,7 +13,19 @@ class ArtRepository {
     private suspend fun <T> fetchCollection(collectionName: String, clazz: Class<T>): Result<List<T>> {
         return try {
             val snapshot = db.collection(collectionName).get().await()
-            Result.success(snapshot.toObjects(clazz))
+            val objects = snapshot.toObjects(clazz)
+            
+            // Debugging image URLs
+            objects.forEach { obj ->
+                when (obj) {
+                    is ArtForm -> Log.d("IMG_DEBUG", "ArtForm: ${obj.name}, URL: ${obj.imageUrl}")
+                    is Artist -> Log.d("IMG_DEBUG", "Artist: ${obj.name}, URL: ${obj.photoUrl}")
+                    is Event -> Log.d("IMG_DEBUG", "Event: ${obj.title}, URL: ${obj.imageUrl}")
+                    is Workshop -> Log.d("IMG_DEBUG", "Workshop: ${obj.title}, URL: ${obj.imageUrl}")
+                }
+            }
+            
+            Result.success(objects)
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching collection: $collectionName", e)
             Result.failure(e)
