@@ -7,8 +7,7 @@ import com.example.myapplication.data.model.Enrollment
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.data.repository.ArtRepository
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class WorkshopViewModel : ViewModel() {
@@ -40,20 +39,19 @@ class WorkshopViewModel : ViewModel() {
         get() = FirebaseAuth.getInstance().currentUser?.uid ?: "guest_user"
 
     fun fetchWorkshops() {
-        viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            repository.getWorkshops().onSuccess { list ->
+        repository.observeCollection("workshops", Workshop::class.java)
+            .onStart { _uiState.value = UiState.Loading }
+            .onEach { list ->
                 _workshops.value = list
-                
-                // Check enrollment status for each workshop
                 list.forEach { workshop ->
                     checkEnrollment(workshop.id)
                 }
                 _uiState.value = UiState.Success(list)
-            }.onFailure {
+            }
+            .catch { e ->
                 _uiState.value = UiState.Error("Failed to load workshops. Namaskara!")
             }
-        }
+            .launchIn(viewModelScope)
     }
 
     fun enroll(workshop: Workshop) {
@@ -70,7 +68,7 @@ class WorkshopViewModel : ViewModel() {
             
             repository.enrollInWorkshop(enrollment).onSuccess {
                 _enrollmentStatus.value = _enrollmentStatus.value + (workshop.id to true)
-                val successMsg = "Added to your Journey 📜! (${workshop.title})"
+                val successMsg = "Enrollment Confirmed 🎨! Seat reserved for ${workshop.title}."
                 _uiEvent.value = successMsg
                 _lastEnrolledWorkshop.value = workshop
                 _enrollmentUiState.value = UiState.Success(successMsg)

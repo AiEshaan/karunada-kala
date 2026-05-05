@@ -27,6 +27,7 @@ import com.example.myapplication.viewmodel.ChatViewModel
 import android.util.Log
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.firebase.auth.FirebaseAuth
+import com.example.myapplication.viewmodel.AuthViewModel
 import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : ComponentActivity() {
@@ -34,9 +35,6 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         
-        // Initialize Firebase Auth
-        FirebaseAuth.getInstance().signInAnonymously()
-
         // Initialize Firebase Messaging
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
@@ -58,6 +56,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun KarunadaKalaApp() {
     val context = LocalContext.current
+    val authViewModel: AuthViewModel = viewModel()
+    val user by authViewModel.currentUser.collectAsState()
+
     val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
     val isOnboardingDone = remember { prefs.getBoolean("onboarding_done", false) }
 
@@ -69,11 +70,19 @@ fun KarunadaKalaApp() {
     val artViewModel: ArtViewModel = viewModel()
     val chatViewModel: ChatViewModel = viewModel()
 
-    val showBottomBar = currentDestination?.route != NavRoutes.Onboarding.route
+    val showBottomBar = currentDestination?.route != NavRoutes.Onboarding.route &&
+            currentDestination?.route != NavRoutes.Login.route &&
+            currentDestination?.route != NavRoutes.SignUp.route
+
+    val startDestination = when {
+        !isOnboardingDone -> NavRoutes.Onboarding.route
+        user == null -> NavRoutes.Login.route
+        else -> NavRoutes.Explore.route
+    }
 
     LaunchedEffect(currentDestination) {
         val route = currentDestination?.route ?: ""
-        val context = when {
+        val chatContext = when {
             route.contains("explore") -> "Exploring the main heritage gallery."
             route.contains("map") -> "Viewing the cultural network map of Karnataka."
             route.contains("events") -> "Looking at upcoming cultural festivals."
@@ -82,7 +91,7 @@ fun KarunadaKalaApp() {
             route.contains("detail") -> "Viewing deep details of a specific art form."
             else -> "General browsing of Karunada Kala app."
         }
-        chatViewModel.setContext(context)
+        chatViewModel.setContext(chatContext)
     }
 
     Scaffold(
@@ -165,16 +174,40 @@ fun KarunadaKalaApp() {
 
         NavHost(
             navController = navController,
-            startDestination = if (isOnboardingDone) NavRoutes.Explore.route else NavRoutes.Onboarding.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(if (showBottomBar) paddingValues else androidx.compose.foundation.layout.PaddingValues(0.dp))
         ) {
             composable(NavRoutes.Onboarding.route) {
                 OnboardingScreen(onFinish = {
                     prefs.edit().putBoolean("onboarding_done", true).apply()
-                    navController.navigate(NavRoutes.Explore.route) {
+                    navController.navigate(NavRoutes.Login.route) {
                         popUpTo(NavRoutes.Onboarding.route) { inclusive = true }
                     }
                 })
+            }
+            composable(NavRoutes.Login.route) {
+                LoginScreen(
+                    onLoginSuccess = {
+                        navController.navigate(NavRoutes.Explore.route) {
+                            popUpTo(NavRoutes.Login.route) { inclusive = true }
+                        }
+                    },
+                    onNavigateToSignUp = {
+                        navController.navigate(NavRoutes.SignUp.route)
+                    }
+                )
+            }
+            composable(NavRoutes.SignUp.route) {
+                SignUpScreen(
+                    onSignUpSuccess = {
+                        navController.navigate(NavRoutes.Explore.route) {
+                            popUpTo(NavRoutes.SignUp.route) { inclusive = true }
+                        }
+                    },
+                    onNavigateToLogin = {
+                        navController.navigate(NavRoutes.Login.route)
+                    }
+                )
             }
             composable(NavRoutes.Explore.route) {
                 ExploreScreen(navController, viewModel = artViewModel, chatViewModel = chatViewModel)

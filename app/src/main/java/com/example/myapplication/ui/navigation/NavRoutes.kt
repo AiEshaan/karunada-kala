@@ -14,6 +14,8 @@ sealed class NavRoutes(val route: String) {
 
     // Utility & Secondary Screens
     object Onboarding : NavRoutes("onboarding")
+    object Login : NavRoutes("login")
+    object SignUp : NavRoutes("signup")
     object Detail : NavRoutes("detail/{name}/{description}/{imageUrl}/{artistId}/{category}")
     object ArtistDetail : NavRoutes("artist_detail/{artistId}")
 

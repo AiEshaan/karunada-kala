@@ -40,7 +40,7 @@ class KarunadaKalaApplication : Application(), ImageLoaderFactory {
                 OkHttpClient.Builder()
                     .addInterceptor { chain ->
                         val request = chain.request().newBuilder()
-                            .header("User-Agent", "KarunadaKala/1.0 (https://example.com; contact@example.com) Coil/2.7.0")
+                            .header("User-Agent", "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                             .build()
                         chain.proceed(request)
                     }

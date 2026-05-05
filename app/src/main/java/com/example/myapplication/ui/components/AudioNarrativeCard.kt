@@ -39,6 +39,7 @@ fun AudioNarrativeCard(audioUrl: String, title: String) {
     }
 
     var isPlaying by remember { mutableStateOf(false) }
+    var isBufferring by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -68,8 +69,10 @@ fun AudioNarrativeCard(audioUrl: String, title: String) {
         ) {
             IconButton(
                 onClick = {
-                    if (isPlaying) exoPlayer.pause() else exoPlayer.play()
-                    isPlaying = !isPlaying
+                    if (!isBufferring) {
+                        if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                        isPlaying = !isPlaying
+                    }
                 },
                 modifier = Modifier
                     .size(56.dp)

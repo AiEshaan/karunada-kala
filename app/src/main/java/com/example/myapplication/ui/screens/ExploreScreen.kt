@@ -74,12 +74,17 @@ fun ExploreScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
+    val artLegends by viewModel.artLegends.collectAsState()
+    val isGeneratingLegend by viewModel.isGeneratingLegend.collectAsState()
 
     var selectedCategory by remember { mutableStateOf("All") }
     val listState = rememberLazyListState()
     var showChat by remember { mutableStateOf(false) }
     var isSearchFocused by remember { mutableStateOf(false) }
     var isAiAssistantEnabled by remember { mutableStateOf(true) }
+
+    var selectedArtForLegend by remember { mutableStateOf<ArtForm?>(null) }
+    var showLegendSheet by remember { mutableStateOf(false) }
 
     val filteredList by remember(artList, selectedCategory, searchQuery) {
         derivedStateOf {
@@ -191,6 +196,11 @@ fun ExploreScreen(
                                 },
                                 onLikeToggle = {
                                     viewModel.toggleLike(art.id)
+                                },
+                                onShowLegend = {
+                                    selectedArtForLegend = art
+                                    viewModel.generateLegend(art.name)
+                                    showLegendSheet = true
                                 }
                             )
                         }
@@ -221,6 +231,64 @@ fun ExploreScreen(
                 viewModel = chatViewModel,
                 onDismiss = { showChat = false }
             )
+        }
+
+        if (showLegendSheet && selectedArtForLegend != null) {
+            ModalBottomSheet(
+                onDismissRequest = { showLegendSheet = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                        .padding(bottom = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "📜 THE ANCIENT LEGEND",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        selectedArtForLegend?.name ?: "",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    
+                    if (isGeneratingLegend && !artLegends.containsKey(selectedArtForLegend?.name)) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Kala is unrolling the archives...", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
+                    } else {
+                        Text(
+                            text = artLegends[selectedArtForLegend?.name] ?: "The archives are quiet for this art form, but its beauty speaks for itself.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            fontStyle = FontStyle.Italic,
+                            lineHeight = 28.sp
+                        )
+                    }
+                    
+                    Spacer(Modifier.height(32.dp))
+                    
+                    Button(
+                        onClick = { 
+                            showLegendSheet = false
+                            NavRoutes.navigateToDetail(navController, selectedArtForLegend!!)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("DIVE DEEPER INTO HISTORY")
+                    }
+                }
+            }
         }
     }
 }

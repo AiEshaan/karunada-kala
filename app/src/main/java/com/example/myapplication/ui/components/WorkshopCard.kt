@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.components
 
+import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -41,6 +42,7 @@ fun WorkshopCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
+            Log.d("IMG_CHECK", "Workshop ID: ${workshop.id}, Title: ${workshop.title}, URL = ${workshop.imageUrl}")
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = workshop.imageUrl,
@@ -64,7 +66,7 @@ fun WorkshopCard(
                     )
                 }
                 Text(
-                    text = "₹${workshop.fee}",
+                    text = workshop.fee,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 20.sp

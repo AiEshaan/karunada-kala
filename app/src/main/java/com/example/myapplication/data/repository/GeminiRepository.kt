@@ -185,4 +185,38 @@ class GeminiRepository {
             Result.failure(e)
         }
     }
+
+    suspend fun suggestSearchQueries(query: String): Result<List<String>> {
+        return try {
+            val prompt = """
+            The user is searching for Karnataka heritage and arts. 
+            Based on the partial search query "$query", suggest 3 relevant cultural topics, art forms, or locations in Karnataka.
+            Provide ONLY the names as a comma-separated list.
+            """
+            val response = model.generateContent(prompt).text ?: ""
+            val suggestions = response.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(3)
+            Result.success(suggestions)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error suggesting queries", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun suggestCaptionForImage(bitmap: Bitmap): Result<String> {
+        return try {
+            val prompt = """
+            You are a poetic cultural guide. Write a short, elegant 1-2 line caption for this image 
+            rooted in Karnataka's culture and heritage. Keep it evocative and respectful.
+            """
+            val inputContent = content {
+                image(bitmap)
+                text(prompt)
+            }
+            val response = model.generateContent(inputContent).text
+            if (response != null) Result.success(response.trim()) else Result.failure(Exception("Empty response"))
+        } catch (e: Exception) {
+            Log.e(TAG, "Error suggesting caption", e)
+            Result.failure(e)
+        }
+    }
 }

@@ -25,6 +25,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -61,6 +62,7 @@ fun DetailScreen(
 
     val aiDescriptions by viewModel.aiDescriptions.collectAsState()
     val artLegends by viewModel.artLegends.collectAsState()
+    val artForms by viewModel.artForms.collectAsState()
     val selectedArtist by artistViewModel.selectedArtist.collectAsState()
 
     var entered by remember { mutableStateOf(false) }
@@ -82,6 +84,10 @@ fun DetailScreen(
             artistViewModel.loadArtistById(artistId)
         }
     }
+
+    val currentArtForm = artForms.find { it.name == name }
+    val dynamicAudioUrl = currentArtForm?.audioUrl.takeIf { it?.isNotBlank() == true } ?: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+    val dynamicVideoUrl = currentArtForm?.videoUrl.takeIf { it?.isNotBlank() == true } ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -226,14 +232,19 @@ fun DetailScreen(
 
             // 🎧 AUDIO NARRATIVE (Artisan Voice)
             AudioNarrativeCard(
-                audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+                audioUrl = dynamicAudioUrl,
                 title = name
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
             // 🎥 VIDEO B-ROLL
-            VideoBrollCard(videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
+            VideoBrollCard(videoUrl = dynamicVideoUrl)
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // 👨‍🏫 MENTORSHIP SECTION
+            MentorshipCard(artist = selectedArtist)
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -247,6 +258,61 @@ fun DetailScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             Spacer(modifier = Modifier.height(48.dp))
+        }
+    }
+}
+
+@Composable
+fun MentorshipCard(artist: com.example.myapplication.data.model.Artist?) {
+    val localContext = LocalContext.current
+    var isRequested by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        shape = RoundedCornerShape(24.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text(
+                text = "GURU-SHISHYA MENTORSHIP",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Learn from the Master",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Connect with ${artist?.name ?: "this master"} for professional training and guidance in ${artist?.artType ?: "this art form"}.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(24.dp))
+            
+            Button(
+                onClick = {
+                    if (!isRequested) {
+                        isRequested = true
+                        android.widget.Toast.makeText(localContext, "Mentorship request sent to the Guru! 🙏", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = if (isRequested) ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) else ButtonDefaults.buttonColors()
+            ) {
+                Text(
+                    text = if (isRequested) "Request Sent ✓" else "Request Mentorship",
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

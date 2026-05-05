@@ -12,7 +12,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -65,11 +67,13 @@ fun MapScreen(
     val haptic = LocalHapticFeedback.current
     
     val mapItems by mapViewModel.mapItems.collectAsState()
-    val stableItems = remember(mapItems) { mapItems } // Removed .take(50) to allow all items
+    val stableItems = remember(mapItems.hashCode()) { mapItems.take(50) }
     val filterType by mapViewModel.selectedFilter.collectAsState()
+    val showOnlyToday by mapViewModel.showOnlyToday.collectAsState()
     val isLoading by mapViewModel.isLoading.collectAsState()
     val userLocation by mapViewModel.userLocation.collectAsState()
     val nearestItem by mapViewModel.nearestItem.collectAsState()
+    val discoveryAlert by mapViewModel.discoveryAlert.collectAsState()
     
     var selectedItem by remember { mutableStateOf<MapItem?>(null) }
     
@@ -145,13 +149,31 @@ fun MapScreen(
                         clusterItemContent = { item ->
                             val isDeepLinked = item.lat == initialLat && item.lng == initialLng
 
-                            // FIX: Using Marker instead of AdvancedMarker or complex state to avoid Applier crash
-                            Marker(
-                                state = MarkerState(position = item.position),
-                                alpha = if (isDeepLinked) 1.0f else 0.8f,
-                                title = item.itemTitle,
-                                zIndex = if (isDeepLinked) 1.0f else 0.0f
-                            )
+                            // Standard Compose UI for the marker icon
+                            Surface(
+                                modifier = Modifier.size(40.dp),
+                                shape = CircleShape,
+                                color = when (item.type) {
+                                    "Artists" -> MaterialTheme.colorScheme.primary
+                                    "Events" -> Color(0xFFD4AF37)
+                                    "Workshops" -> Color(0xFF008080)
+                                    else -> MaterialTheme.colorScheme.secondary
+                                },
+                                tonalElevation = 4.dp,
+                                border = if (isDeepLinked) BorderStroke(3.dp, Color.White) else null
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = when (item.type) {
+                                            "Artists" -> "🎭"
+                                            "Events" -> "🎪"
+                                            "Workshops" -> "🧑‍🏫"
+                                            else -> "📍"
+                                        },
+                                        fontSize = 20.sp
+                                    )
+                                }
+                            }
                         },
                         clusterContent = { cluster ->
                             val clusterSize = cluster.items.size
@@ -207,36 +229,26 @@ fun MapScreen(
             )
         }
 
-        // 📍 Nearby Auto-Alert
-        nearestItem?.let { nearest ->
+        // 📍 Discovery Alert (New Phase 3 Feature)
+        discoveryAlert?.let { alert ->
             AnimatedVisibility(
                 visible = selectedItem == null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically(),
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 160.dp)
             ) {
                 Surface(
-                    onClick = { 
-                        selectedItem = nearest
-                        cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(nearest.position, 12f))
-                    },
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.secondary,
                     shape = RoundedCornerShape(50),
                     tonalElevation = 8.dp
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("✨", fontSize = 14.sp)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "Explore ${nearest.itemTitle} nearby",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = alert,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.ExtraBold
+                    )
                 }
             }
         }
@@ -246,13 +258,20 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 100.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.Center
         ) {
+            KalaFilterChip(
+                selected = showOnlyToday,
+                onClick = { mapViewModel.toggleNowFilter() },
+                label = "Happening Now 🔥"
+            )
+            
             val filters = listOf("All", "Artists", "Events", "Workshops")
             filters.forEach { filter ->
                 KalaFilterChip(
-                    selected = filterType == filter,
+                    selected = filterType == filter && !showOnlyToday,
                     onClick = { mapViewModel.setFilter(filter) },
                     label = filter
                 )
@@ -444,7 +463,7 @@ fun WorkshopMapUI(workshop: Workshop, viewModel: WorkshopViewModel, navControlle
                     NavRoutes.navigateToDetail(
                         navController,
                         workshop.title,
-                        "Learn from ${workshop.artistName}. Art form: ${workshop.artType}. Fee: ₹${workshop.fee}",
+                        "Learn from ${workshop.artistName}. Art form: ${workshop.artType}. Fee: ${workshop.fee}",
                         workshop.imageUrl,
                         workshop.artistId,
                         "Workshop"

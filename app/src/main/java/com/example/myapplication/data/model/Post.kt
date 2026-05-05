@@ -15,5 +15,6 @@ data class Post(
     val location: String? = null,
     val timestamp: com.google.firebase.Timestamp? = null,
     val likes: Int = 0,
-    @get:PropertyName("liked_by") @set:PropertyName("liked_by") var likedBy: List<String> = emptyList()
+    @get:PropertyName("liked_by") @set:PropertyName("liked_by") var likedBy: List<String> = emptyList(),
+    @PropertyName("media_type") var mediaType: String = "image"
 )

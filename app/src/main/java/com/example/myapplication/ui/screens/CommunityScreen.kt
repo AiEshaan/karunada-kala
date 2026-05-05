@@ -44,14 +44,25 @@ import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.core.utils.TimeUtils
 import com.example.myapplication.ui.components.UiStateHandler
 import com.example.myapplication.viewmodel.PostViewModel
-import com.google.firebase.Timestamp
-import java.text.SimpleDateFormat
-import java.util.*
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.os.Build
+import android.provider.MediaStore
+import com.example.myapplication.ui.components.KalaActionButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
     val posts by viewModel.filteredPosts.collectAsState()
+    val sortOrder by viewModel.sortOrder.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val createPostState by viewModel.createPostState.collectAsState()
     var showCreateSheet by remember { mutableStateOf(false) }
@@ -77,12 +88,21 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
         topBar = {
             CenterAlignedTopAppBar(
                 title = { 
-                    Text(
-                        "CHRONICLES", 
-                        style = MaterialTheme.typography.titleMedium,
-                        letterSpacing = 4.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    ) 
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "CHRONICLES", 
+                            style = MaterialTheme.typography.titleMedium,
+                            letterSpacing = 4.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Row(
+                            modifier = Modifier.padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            SortTab("Recent", active = sortOrder == "Recent") { viewModel.setSortOrder("Recent") }
+                            SortTab("Trending", active = sortOrder == "Trending") { viewModel.setSortOrder("Trending") }
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
             )
@@ -101,7 +121,7 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             UiStateHandler(
                 uiState = uiState,
-                onRetry = { viewModel.loadPosts() },
+                onRetry = { /* Automatically handled by Flow subscription */ },
                 emptyContent = { EmptyChroniclesState() }
             ) { posts ->
                 LazyVerticalGrid(
@@ -130,9 +150,24 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
 }
 
 @Composable
+fun SortTab(label: String, active: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label.uppercase(),
+        modifier = Modifier.clickable { onClick() },
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = if (active) FontWeight.Black else FontWeight.Normal,
+        color = if (active) MaterialTheme.colorScheme.primary else Color.Gray,
+        letterSpacing = 1.sp
+    )
+}
+
+@Composable
 fun CulturalPostCard(post: Post, viewModel: PostViewModel = viewModel()) {
     val userId = viewModel.currentUserId
-    val isLiked = post.likedBy.contains(userId)
+    var localLiked by remember(post.id) { mutableStateOf(post.likedBy.contains(userId)) }
+    var localLikeCount by remember(post.id) { mutableStateOf(post.likes) }
+    var isProcessingLike by remember { mutableStateOf(false) }
+    
     var showComments by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -147,14 +182,24 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel = viewModel()) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            // Post image with aspect ratio constraint
+            // Post media with aspect ratio constraint
             Box(modifier = Modifier.aspectRatio(0.8f)) {
-                AsyncImage(
-                    model = post.imageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (post.mediaType == "video" && post.imageUrl.isNotBlank()) {
+                    VideoPlayer(videoUrl = post.imageUrl)
+                    Icon(
+                        Icons.Default.PlayCircle,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.Center).size(64.dp).alpha(0.7f),
+                        tint = Color.White
+                    )
+                } else {
+                    AsyncImage(
+                        model = post.imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
                 // Location Overlay (Glassmorphism inspired)
                 post.location?.let { loc ->
                     Box(
@@ -253,24 +298,34 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel = viewModel()) {
                         val likeScale = remember { Animatable(1f) }
                         val coroutineScope = rememberCoroutineScope()
                         
-                        IconButton(onClick = { 
-                            coroutineScope.launch {
-                                likeScale.animateTo(1.4f, tween(100))
-                                likeScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy))
+                        IconButton(
+                            onClick = { 
+                                if (isProcessingLike) return@IconButton
+                                isProcessingLike = true
+                                
+                                // Optimistic Update
+                                localLiked = !localLiked
+                                localLikeCount += if (localLiked) 1 else -1
+                                
+                                coroutineScope.launch {
+                                    likeScale.animateTo(1.4f, tween(100))
+                                    likeScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy))
+                                    viewModel.toggleLike(post.id) 
+                                    isProcessingLike = false
+                                }
                             }
-                            viewModel.toggleLike(post.id) 
-                        }) {
+                        ) {
                             Icon(
-                                if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                if (localLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = "Like",
-                                tint = if (isLiked) Color.Red else Color.Gray,
+                                tint = if (localLiked) Color.Red else Color.Gray,
                                 modifier = Modifier.graphicsLayer {
                                     scaleX = likeScale.value
                                     scaleY = likeScale.value
                                 }
                             )
                         }
-                        Text("${post.likes}", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                        Text("$localLikeCount", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                         
                         Spacer(modifier = Modifier.width(16.dp))
                         
@@ -355,15 +410,23 @@ fun CommentsSheet(postId: String, onDismiss: () -> Unit, viewModel: PostViewMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreatePostSheet(onDismiss: () -> Unit, onPost: (Uri, String, String?) -> Unit, isLoading: Boolean) {
+fun CreatePostSheet(
+    onDismiss: () -> Unit,
+    onPost: (Uri, String, String?) -> Unit,
+    isLoading: Boolean,
+    viewModel: PostViewModel = viewModel()
+) {
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var caption by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
+    val aiCaptionState by viewModel.aiCaptionState.collectAsState()
+    val context = LocalContext.current
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         selectedImageUri = uri
+        viewModel.resetAiCaption()
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -401,6 +464,53 @@ fun CreatePostSheet(onDismiss: () -> Unit, onPost: (Uri, String, String?) -> Uni
             }
             
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (selectedImageUri != null) {
+                KalaActionButton(
+                    text = when (aiCaptionState) {
+                        is UiState.Loading -> "✨ Kala is crafting..."
+                        is UiState.Success -> "✨ Suggest Another"
+                        else -> "✨ Suggest AI Caption"
+                    },
+                    onClick = {
+                        val bitmap = if (Build.VERSION.SDK_INT < 28) {
+                            MediaStore.Images.Media.getBitmap(context.contentResolver, selectedImageUri)
+                        } else {
+                            val source = ImageDecoder.createSource(context.contentResolver, selectedImageUri!!)
+                            ImageDecoder.decodeBitmap(source)
+                        }
+                        viewModel.generateAiCaption(bitmap)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
+                    contentColor = MaterialTheme.colorScheme.secondary,
+                    enabled = aiCaptionState !is UiState.Loading
+                )
+
+                if (aiCaptionState is UiState.Success) {
+                    val suggested = (aiCaptionState as UiState.Success<String>).data
+                    Card(
+                        modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(suggested, style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
+                            TextButton(onClick = { caption = suggested }) {
+                                Text("Use this caption", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                } else if (aiCaptionState is UiState.Error) {
+                    Text(
+                        (aiCaptionState as UiState.Error).message,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
             
             OutlinedTextField(
                 value = caption,
@@ -434,6 +544,45 @@ fun CreatePostSheet(onDismiss: () -> Unit, onPost: (Uri, String, String?) -> Uni
             }
         }
     }
+}
+
+@OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+fun VideoPlayer(videoUrl: String) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(videoUrl))
+            prepare()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                exoPlayer.pause()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            exoPlayer.release()
+        }
+    }
+
+    AndroidView(
+        factory = {
+            PlayerView(context).apply {
+                player = exoPlayer
+                useController = true
+                setShowNextButton(false)
+                setShowPreviousButton(false)
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }
 
 @Composable

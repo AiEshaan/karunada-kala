@@ -13,8 +13,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.automirrored.filled.HelpCenter
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +41,7 @@ import com.example.myapplication.data.model.Post
 import com.example.myapplication.core.utils.TimeUtils
 import com.example.myapplication.ui.components.EventCardShimmer
 import com.example.myapplication.ui.navigation.NavRoutes
+import com.example.myapplication.viewmodel.AuthViewModel
 import com.example.myapplication.viewmodel.JourneyViewModel
 import kotlinx.coroutines.delay
 
@@ -51,6 +57,8 @@ fun MyJourneyScreen(
     val userName by viewModel.userName.collectAsState()
     val userAvatar by viewModel.userAvatar.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    
+    var showSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchJourney()
@@ -59,22 +67,31 @@ fun MyJourneyScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            LargeTopAppBar(
+            CenterAlignedTopAppBar(
                 title = { 
                     Text(
                         "MY JOURNEY", 
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 2.sp
+                        letterSpacing = 4.sp
                     ) 
                 },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
+                actions = {
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
         }
     ) { padding ->
+        if (showSettings) {
+            SettingsSheet(onDismiss = { showSettings = false }, navController = navController)
+        }
+        
         AnimatedContent(
             targetState = isLoading,
             label = "journeyTransition",
@@ -100,19 +117,20 @@ fun MyJourneyScreen(
                     contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // 🧍 Profile Header
                     item {
                         ProfileHeader(name = userName, avatarUrl = userAvatar)
                     }
 
-                    // Stats Card
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                             StatsCard(registrations.size, enrollments.size, myChronicles.size)
                         }
                     }
 
-                    // 📜 My Chronicles Section
+                    item {
+                        AchievementSection(registrations.size, enrollments.size, myChronicles.size)
+                    }
+
                     if (myChronicles.isNotEmpty()) {
                         item {
                             SectionHeader("📜 My Chronicles", Modifier.padding(horizontal = 16.dp))
@@ -132,7 +150,6 @@ fun MyJourneyScreen(
                         }
                     }
 
-                    // 🎭 Registered Events Section
                     if (registrations.isNotEmpty()) {
                         item {
                             SectionHeader("🏛 Cultural Engagements", Modifier.padding(horizontal = 16.dp))
@@ -151,7 +168,6 @@ fun MyJourneyScreen(
                         }
                     }
 
-                    // 🎨 Enrolled Workshops Section
                     if (enrollments.isNotEmpty()) {
                         itemsIndexed(enrollments) { index, enrollment ->
                             StaggeredJourneyItem(index + registrations.size) {
@@ -169,6 +185,107 @@ fun MyJourneyScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun AchievementSection(events: Int, workshops: Int, posts: Int) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        SectionHeader("🏆 Achievements")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (posts > 0) BadgeItem("Chronicler 📜", Color(0xFF673AB7))
+            if (workshops > 0) BadgeItem("Scholar 🎨", Color(0xFF009688))
+            if (events > 0) BadgeItem("Explorer 🏛", Color(0xFFFF9800))
+            if (events + workshops + posts > 5) BadgeItem("Guardian 🛡", Color(0xFFE91E63))
+            if (events == 0 && workshops == 0 && posts == 0) {
+                Text("Start your journey to earn badges!", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+fun BadgeItem(label: String, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.1f),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsSheet(
+    onDismiss: () -> Unit,
+    navController: NavController,
+    authViewModel: AuthViewModel = viewModel()
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(24.dp).padding(bottom = 32.dp)) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(24.dp))
+            
+            SettingItem(Icons.Default.Notifications, "Notifications", "Enabled")
+            SettingItem(Icons.Default.Translate, "Language", "English (Kannada Ready)")
+            SettingItem(Icons.Default.Info, "App Version", "1.0.0 (Pro)")
+            SettingItem(Icons.AutoMirrored.Filled.HelpCenter, "Cultural Help Center", null)
+            
+            Spacer(Modifier.height(32.dp))
+
+            Button(
+                onClick = {
+                    authViewModel.logout()
+                    onDismiss()
+                    navController.navigate(NavRoutes.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("LOGOUT")
+            }
+
+            Spacer(Modifier.height(8.dp))
+            
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Close")
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingItem(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            if (value != null) Text(value, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.LightGray)
     }
 }
 

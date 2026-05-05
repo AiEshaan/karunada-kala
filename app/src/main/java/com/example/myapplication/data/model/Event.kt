@@ -5,12 +5,12 @@ import com.google.firebase.firestore.PropertyName
 
 data class Event(
     @DocumentId override val id: String = "",
-    val title: String = "",
-    @get:PropertyName("art_type") @set:PropertyName("art_type") var artType: String = "",
-    val date: String = "",
-    val location: String = "",
-    val description: String = "",
-    @get:PropertyName("image_url") @set:PropertyName("image_url") var imageUrl: String = "",
+    @PropertyName("title") val title: String = "",
+    @PropertyName("artType") var artType: String = "",
+    @PropertyName("date") val date: String = "",
+    @PropertyName("location") val location: String = "",
+    @PropertyName("description") val description: String = "",
+    @PropertyName("imageUrl") var imageUrl: String = "",
     override val lat: Double = 0.0,
     override val lng: Double = 0.0
 ) : MapEntity

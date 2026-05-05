@@ -8,6 +8,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.ui.model.MapItem
 import com.example.myapplication.data.repository.ArtRepository
+import com.example.myapplication.data.model.Artist
+import com.example.myapplication.data.model.Event
+import com.example.myapplication.data.model.Workshop
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.*
@@ -17,13 +20,16 @@ import kotlinx.coroutines.tasks.await
 class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ArtRepository()
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
-    private val TAG = "MapViewModel"
+    private val tag = "MapViewModel"
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
     private val _selectedFilter = MutableStateFlow("All")
     val selectedFilter: StateFlow<String> = _selectedFilter
+
+    private val _showOnlyToday = MutableStateFlow(false)
+    val showOnlyToday: StateFlow<Boolean> = _showOnlyToday
 
     private val _artists = MutableStateFlow<List<MapItem>>(emptyList())
     private val _events = MutableStateFlow<List<MapItem>>(emptyList())
@@ -35,46 +41,87 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _userLocation = MutableStateFlow<Location?>(null)
     val userLocation: StateFlow<Location?> = _userLocation
 
+    private val _discoveryAlert = MutableStateFlow<String?>(null)
+    val discoveryAlert: StateFlow<String?> = _discoveryAlert
+
     val mapItems: StateFlow<List<MapItem>> = combine(
-        _artists, _events, _workshops, _selectedFilter
-    ) { artists, events, workshops, filter ->
-        val all = artists + events + workshops
+        _artists,
+        _events,
+        _workshops,
+        _selectedFilter,
+        _showOnlyToday,
+    ) { artists, events, workshops, filter, showToday ->
+        var all = artists + events + workshops
+        
+        if (showToday) {
+            val today = try {
+                java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+            } catch (e: Exception) {
+                ""
+            }
+            if (today.isNotEmpty()) {
+                all = all.filter { item ->
+                    ((item.data as? Event)?.date?.contains(today, ignoreCase = true) == true) ||
+                    ((item.data as? Workshop)?.date?.contains(today, ignoreCase = true) == true)
+                }
+            }
+        }
+        
         if (filter == "All") all else all.filter { it.type.equals(filter, ignoreCase = true) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun fetchData() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            try {
-                // Parallelize Firestore calls to prevent blocking the UI thread sequentially
-                val artistsDeferred = async { repository.getArtists() }
-                val eventsDeferred = async { repository.getEvents() }
-                val workshopsDeferred = async { repository.getWorkshops() }
-
-                val artistsResult = artistsDeferred.await()
-                val eventsResult = eventsDeferred.await()
-                val workshopsResult = workshopsDeferred.await()
-
-                // Perform transformations and distance calculations off the main thread
-                withContext(Dispatchers.Default) {
-                    artistsResult.onSuccess { artistList ->
-                        _artists.value = artistList.map { MapItem(it, "Artists", it.name) }
-                    }
-                    eventsResult.onSuccess { eventList ->
-                        _events.value = eventList.map { MapItem(it, "Events", it.title) }
-                    }
-                    workshopsResult.onSuccess { workshopList ->
-                        _workshops.value = workshopList.map { MapItem(it, "Workshops", it.title) }
-                    }
-
-                    calculateNearest(_artists.value + _events.value + _workshops.value)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Unexpected error fetching map data", e)
-            } finally {
-                _isLoading.value = false
+        _isLoading.value = true
+        
+        // Observe Artists
+        repository.observeCollection("artists", Artist::class.java)
+            .onEach { artistList ->
+                _artists.value = artistList.map { MapItem(it, "Artists", it.name) }
+                updateDiscoveryAlert()
+                calculateNearestAndStopLoading()
             }
+            .launchIn(viewModelScope)
+
+        // Observe Events
+        repository.observeCollection("events", Event::class.java)
+            .onEach { eventList ->
+                _events.value = eventList.map { MapItem(it, "Events", it.title) }
+                updateDiscoveryAlert()
+                calculateNearestAndStopLoading()
+            }
+            .launchIn(viewModelScope)
+
+        // Observe Workshops
+        repository.observeCollection("workshops", Workshop::class.java)
+            .onEach { workshopList ->
+                _workshops.value = workshopList.map { MapItem(it, "Workshops", it.title) }
+                updateDiscoveryAlert()
+                calculateNearestAndStopLoading()
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun updateDiscoveryAlert() {
+        val location = _userLocation.value ?: return
+        val allItems = _artists.value + _events.value + _workshops.value
+        
+        val nearby = allItems.find { item ->
+            val results = FloatArray(1)
+            Location.distanceBetween(location.latitude, location.longitude, item.lat, item.lng, results)
+            results[0] < 5000 // 5km radius
         }
+        
+        _discoveryAlert.value = nearby?.let { 
+            "✨ You are near ${it.itemTitle} (${it.type})!"
+        }
+    }
+
+    private fun calculateNearestAndStopLoading() {
+        val allItems = _artists.value + _events.value + _workshops.value
+        _userLocation.value?.let {
+            calculateNearest(allItems, it.latitude, it.longitude)
+        } ?: calculateNearest(allItems)
+        _isLoading.value = false
     }
 
     @SuppressLint("MissingPermission")
@@ -84,10 +131,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null).await()
                 _userLocation.value = location
                 location?.let { 
+                    updateDiscoveryAlert()
                     calculateNearest(_artists.value + _events.value + _workshops.value, it.latitude, it.longitude)
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Location unavailable, using default", e)
+                Log.w(tag, "Location unavailable, using default", e)
                 calculateNearest(_artists.value + _events.value + _workshops.value)
             }
         }
@@ -104,11 +152,16 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun calculateNearest(items: List<MapItem>) {
-        // Fallback to Bangalore if user location not yet fetched
         calculateNearest(items, 12.9716, 77.5946)
     }
 
     fun setFilter(filter: String) {
         _selectedFilter.value = filter
+        if (filter != "Now") _showOnlyToday.value = false
+    }
+
+    fun toggleNowFilter() {
+        _showOnlyToday.update { !it }
+        if (_showOnlyToday.value) _selectedFilter.value = "All"
     }
 }

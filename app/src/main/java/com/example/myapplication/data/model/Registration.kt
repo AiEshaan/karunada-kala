@@ -8,6 +8,7 @@ data class Registration(
     val eventTitle: String = "",
     val artType: String = "",
     val status: String = "Interested",
+    val date: String = "",
     val timestamp: Timestamp? = null,
     val type: String = "Manual" // Internal source tracking
 )

@@ -3,7 +3,12 @@ package com.example.myapplication.data.repository
 import android.util.Log
 import com.example.myapplication.data.model.*
 import com.google.firebase.firestore.*
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+
+import java.util.UUID
 
 class ArtRepository {
 
@@ -73,6 +78,47 @@ class ArtRepository {
         return fetchCollection("arts", ArtForm::class.java)
     }
 
+    fun <T : Any> observeCollection(collectionName: String, clazz: Class<T>): Flow<List<T>> = callbackFlow {
+        val subscription = db.collection(collectionName)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val objects = snapshot?.toObjects(clazz) ?: emptyList()
+                trySend(objects)
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    fun observeUserRegistrations(userId: String): Flow<List<Registration>> = callbackFlow {
+        val subscription = db.collection("registrations")
+            .whereEqualTo("userId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val registrations = snapshot?.toObjects(Registration::class.java) ?: emptyList()
+                trySend(registrations)
+            }
+        awaitClose { subscription.remove() }
+    }
+
+    fun observeUserEnrollments(userId: String): Flow<List<Enrollment>> = callbackFlow {
+        val subscription = db.collection("enrollments")
+            .whereEqualTo("userId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val enrollments = snapshot?.toObjects(Enrollment::class.java) ?: emptyList()
+                trySend(enrollments)
+            }
+        awaitClose { subscription.remove() }
+    }
+
     suspend fun getArtists(): Result<List<Artist>> {
         return fetchCollection("artists", Artist::class.java)
     }
@@ -140,10 +186,13 @@ class ArtRepository {
         }
     }
 
-    suspend fun registerForEvent(registration: Registration): Result<Unit> {
+    suspend fun registerForEvent(registration: Registration): Result<String> {
         return try {
-            db.collection("registrations").add(registration).await()
-            Result.success(Unit)
+            val ticketId = "KALA-${UUID.randomUUID().toString().take(6).uppercase()}"
+            val finalRegistration = registration.copy(id = ticketId)
+            
+            db.collection("registrations").document(ticketId).set(finalRegistration).await()
+            Result.success(ticketId)
         } catch (e: Exception) {
             Log.e(TAG, "Error registering for event: ${registration.eventTitle}", e)
             Result.failure(e)

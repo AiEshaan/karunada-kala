@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.components
 
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -40,7 +41,8 @@ import kotlinx.coroutines.launch
 fun ArtCard(
     art: ArtForm,
     onNavigate: () -> Unit,
-    onLikeToggle: () -> Unit = {}
+    onLikeToggle: () -> Unit = {},
+    onShowLegend: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -53,6 +55,7 @@ fun ArtCard(
     
     // Preload image for smooth transition
     LaunchedEffect(art.imageUrl) {
+        Log.d("IMG_CHECK", "ArtForm ID: ${art.id}, Name: ${art.name}, URL = ${art.imageUrl}")
         val request = ImageRequest.Builder(context)
             .data(art.imageUrl)
             .crossfade(true)
@@ -99,15 +102,10 @@ fun ArtCard(
                     },
                     onLongPress = { 
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        isFlipped = !isFlipped 
+                        onShowLegend()
                     },
                     onTap = { 
-                        if (isFlipped) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            isFlipped = false
-                        } else {
-                            onNavigate()
-                        }
+                        onNavigate()
                     }
                 )
             }
