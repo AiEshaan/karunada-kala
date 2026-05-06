@@ -1,11 +1,9 @@
 package com.example.myapplication.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -13,14 +11,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.automirrored.filled.HelpCenter
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +24,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,12 +35,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.data.model.Post
-import com.example.myapplication.core.utils.TimeUtils
 import com.example.myapplication.ui.components.EventCardShimmer
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.viewmodel.AuthViewModel
 import com.example.myapplication.viewmodel.JourneyViewModel
-import kotlinx.coroutines.delay
+import com.google.firebase.Timestamp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,8 +53,10 @@ fun MyJourneyScreen(
     val userName by viewModel.userName.collectAsState()
     val userAvatar by viewModel.userAvatar.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val badges by viewModel.badges.collectAsState()
     
     var showSettings by remember { mutableStateOf(false) }
+    var showEditProfile by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchJourney()
@@ -91,69 +89,95 @@ fun MyJourneyScreen(
         if (showSettings) {
             SettingsSheet(onDismiss = { showSettings = false }, navController = navController)
         }
-        
-        AnimatedContent(
-            targetState = isLoading,
-            label = "journeyTransition",
-            modifier = Modifier.padding(padding),
-            transitionSpec = {
-                fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
-            }
-        ) { loading ->
-            if (loading) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item { Box(Modifier.fillMaxWidth().height(120.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(24.dp))) }
-                    items(3) { EventCardShimmer() }
+
+        if (showEditProfile) {
+            EditProfileDialog(
+                currentName = userName,
+                currentAvatar = userAvatar,
+                onDismiss = { showEditProfile = false },
+                onSave = { name, avatar ->
+                    viewModel.updateProfile(name, avatar)
+                    showEditProfile = false
                 }
-            } else if (registrations.isEmpty() && enrollments.isEmpty() && myChronicles.isEmpty()) {
-                EmptyJourneyState(onExploreClick = { navController.navigate(NavRoutes.Explore.route) })
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item {
-                        ProfileHeader(name = userName, avatarUrl = userAvatar)
+            )
+        }
+        
+        PullToRefreshBox(
+            isRefreshing = isLoading,
+            onRefresh = { viewModel.fetchJourney() },
+            modifier = Modifier.padding(padding)
+        ) {
+            AnimatedContent(
+                targetState = isLoading,
+                label = "journeyTransition",
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+                }
+            ) { loading ->
+                if (loading) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        item { Box(Modifier.fillMaxWidth().height(120.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(24.dp))) }
+                        items(3) { EventCardShimmer() }
                     }
-
-                    item {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            StatsCard(registrations.size, enrollments.size, myChronicles.size)
-                        }
-                    }
-
-                    item {
-                        AchievementSection(registrations.size, enrollments.size, myChronicles.size)
-                    }
-
-                    if (myChronicles.isNotEmpty()) {
+                } else if (registrations.isEmpty() && enrollments.isEmpty() && myChronicles.isEmpty()) {
+                    EmptyJourneyState(onExploreClick = { navController.navigate(NavRoutes.Explore.route) })
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
                         item {
-                            SectionHeader("📜 My Chronicles", Modifier.padding(horizontal = 16.dp))
+                            ProfileHeader(
+                                name = userName, 
+                                avatarUrl = userAvatar, 
+                                level = calculateLevel(registrations.size, enrollments.size, myChronicles.size),
+                                onEditClick = { showEditProfile = true }
+                            )
                         }
+
                         item {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp)
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                myChronicles.forEach { post ->
-                                    MyPostCard(post)
+                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                StatsCard(registrations.size, enrollments.size, myChronicles.size)
+                            }
+                        }
+
+                        item {
+                            XpProgressBar(registrations.size, enrollments.size, myChronicles.size)
+                        }
+
+                        item {
+                            AchievementSection(badges)
+                        }
+
+                        if (myChronicles.isNotEmpty()) {
+                            item {
+                                SectionHeader("📜 My Chronicles", Modifier.padding(horizontal = 16.dp))
+                            }
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    myChronicles.forEach { post ->
+                                        MyPostCard(post)
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    if (registrations.isNotEmpty()) {
                         item {
-                            SectionHeader("🏛 Cultural Engagements", Modifier.padding(horizontal = 16.dp))
+                            SectionHeader("🏺 Cultural Engagements", Modifier.padding(horizontal = 16.dp))
                         }
+
                         itemsIndexed(registrations) { index, reg ->
                             StaggeredJourneyItem(index) {
                                 TimelineJourneyItem(
@@ -161,19 +185,17 @@ fun MyJourneyScreen(
                                     subtitle = reg.artType,
                                     timestamp = reg.timestamp,
                                     status = reg.status,
-                                    accentColor = Color(0xFFD4AF37),
-                                    isLast = index == registrations.size - 1 && enrollments.isEmpty()
+                                    accentColor = MaterialTheme.colorScheme.secondary,
+                                    isLast = (index == registrations.size - 1) && enrollments.isEmpty()
                                 )
                             }
                         }
-                    }
 
-                    if (enrollments.isNotEmpty()) {
                         itemsIndexed(enrollments) { index, enrollment ->
                             StaggeredJourneyItem(index + registrations.size) {
                                 TimelineJourneyItem(
                                     title = enrollment.workshopTitle,
-                                    subtitle = "Confirmed Enrollment",
+                                    subtitle = "Heritage Workshop",
                                     timestamp = enrollment.timestamp,
                                     status = "Enrolled",
                                     accentColor = MaterialTheme.colorScheme.primary,
@@ -189,40 +211,96 @@ fun MyJourneyScreen(
 }
 
 @Composable
-fun AchievementSection(events: Int, workshops: Int, posts: Int) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        SectionHeader("🏆 Achievements")
+fun AchievementSection(badges: List<com.example.myapplication.data.model.Badge>) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        SectionHeader("🏆 Achievements", Modifier.padding(bottom = 12.dp))
+        
+        val unlockedCount = badges.count { it.isUnlocked }
+        val progress = if (badges.isNotEmpty()) unlockedCount.toFloat() / badges.size else 0f
+        
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Cultural Progress", style = MaterialTheme.typography.labelMedium)
+                Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            )
+        }
+
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (posts > 0) BadgeItem("Chronicler 📜", Color(0xFF673AB7))
-            if (workshops > 0) BadgeItem("Scholar 🎨", Color(0xFF009688))
-            if (events > 0) BadgeItem("Explorer 🏛", Color(0xFFFF9800))
-            if (events + workshops + posts > 5) BadgeItem("Guardian 🛡", Color(0xFFE91E63))
-            if (events == 0 && workshops == 0 && posts == 0) {
-                Text("Start your journey to earn badges!", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            badges.forEach { badge ->
+                BadgeItem(badge)
             }
         }
     }
 }
 
 @Composable
-fun BadgeItem(label: String, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
+fun BadgeItem(badge: com.example.myapplication.data.model.Badge) {
+    Card(
+        modifier = Modifier.width(140.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (badge.isUnlocked) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) 
+                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        border = if (badge.isUnlocked) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) else null
     ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            fontWeight = FontWeight.Bold
-        )
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = if (badge.isUnlocked) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.3f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(badge.icon, fontSize = 24.sp, modifier = Modifier.graphicsLayer { alpha = if (badge.isUnlocked) 1f else 0.5f })
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                badge.name,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                color = if (badge.isUnlocked) MaterialTheme.colorScheme.primary else Color.Gray
+            )
+            Text(
+                badge.description,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                lineHeight = 12.sp,
+                color = Color.Gray
+            )
+            
+            if (!badge.isUnlocked && badge.totalRequired > 1) {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { badge.currentProgress.toFloat() / badge.totalRequired },
+                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                    color = Color.Gray,
+                    trackColor = Color.Gray.copy(alpha = 0.2f)
+                )
+                Text(
+                    "${badge.currentProgress}/${badge.totalRequired}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 8.sp,
+                    color = Color.Gray
+                )
+            }
+        }
     }
 }
 
@@ -240,7 +318,18 @@ fun SettingsSheet(
             
             SettingItem(Icons.Default.Notifications, "Notifications", "Enabled")
             SettingItem(Icons.Default.Translate, "Language", "English (Kannada Ready)")
-            SettingItem(Icons.Default.Info, "App Version", "1.0.0 (Pro)")
+            
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.DarkMode, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(16.dp))
+                Text("Dark Mode", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Switch(checked = isSystemInDarkTheme(), onCheckedChange = { /* Toggle Logic */ })
+            }
+
+            SettingItem(Icons.Default.Info, "App Version", "1.0.0 (WOW)")
             SettingItem(Icons.AutoMirrored.Filled.HelpCenter, "Cultural Help Center", null)
             
             Spacer(Modifier.height(32.dp))
@@ -279,18 +368,20 @@ fun SettingItem(icon: androidx.compose.ui.graphics.vector.ImageVector, title: St
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-            if (value != null) Text(value, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            if (value != null) {
+                Text(value, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
         }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.LightGray)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.Gray)
     }
 }
 
 @Composable
-fun ProfileHeader(name: String, avatarUrl: String) {
+fun ProfileHeader(name: String, avatarUrl: String, level: String, onEditClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -299,7 +390,7 @@ fun ProfileHeader(name: String, avatarUrl: String) {
     ) {
         Box(contentAlignment = Alignment.BottomEnd) {
             AsyncImage(
-                model = if (avatarUrl.isNotEmpty()) avatarUrl else "https://ui-avatars.com/api/?name=$name&background=D4AF37&color=fff",
+                model = avatarUrl.ifEmpty { "https://ui-avatars.com/api/?name=$name&background=D4AF37&color=fff" },
                 contentDescription = null,
                 modifier = Modifier
                     .size(100.dp)
@@ -311,7 +402,8 @@ fun ProfileHeader(name: String, avatarUrl: String) {
                 modifier = Modifier.size(32.dp),
                 color = MaterialTheme.colorScheme.primary,
                 shape = CircleShape,
-                tonalElevation = 4.dp
+                tonalElevation = 4.dp,
+                onClick = onEditClick
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(16.dp))
@@ -320,27 +412,107 @@ fun ProfileHeader(name: String, avatarUrl: String) {
         }
         Spacer(Modifier.height(16.dp))
         Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("CULTURAL EXPLORER", style = MaterialTheme.typography.labelSmall, color = Color.Gray, letterSpacing = 2.sp)
+        Text(level, style = MaterialTheme.typography.labelSmall, color = Color.Gray, letterSpacing = 2.sp)
+    }
+}
+
+@Composable
+fun EditProfileDialog(
+    currentName: String,
+    currentAvatar: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+    var avatar by remember { mutableStateOf(currentAvatar) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Profile") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Display Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = avatar,
+                    onValueChange = { avatar = it },
+                    label = { Text("Avatar URL (optional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(name, avatar) }) {
+                Text("SAVE")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL")
+            }
+        }
+    )
+}
+
+@Composable
+fun XpProgressBar(registrations: Int, enrollments: Int, chronicles: Int) {
+    val totalXp = registrations * 20 + enrollments * 50 + chronicles * 30
+    val currentLevel = totalXp / 100
+    val progressInLevel = (totalXp % 100) / 100f
+
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Level $currentLevel Heritage Keeper", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text("${(progressInLevel * 100).toInt()}% to Level ${currentLevel + 1}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+        }
+        Spacer(Modifier.height(8.dp))
+        LinearProgressIndicator(
+            progress = { progressInLevel },
+            modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        )
+    }
+}
+
+fun calculateLevel(registrations: Int, enrollments: Int, chronicles: Int): String {
+    val total = registrations + enrollments + chronicles
+    return when {
+        total > 15 -> "Vishwa Karma (World Architect)"
+        total > 10 -> "Raja Guru (Royal Master)"
+        total > 5 -> "Kala Acharya (Art Teacher)"
+        else -> "Abhyasi (Seeker)"
     }
 }
 
 @Composable
 fun MyPostCard(post: Post) {
     Card(
-        modifier = Modifier.size(160.dp, 200.dp),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+        modifier = Modifier.size(140.dp),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Box {
-            AsyncImage(model = post.imageUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.6f)))))
+            AsyncImage(
+                model = post.imageUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.6f))))
+            )
             Text(
                 post.caption,
-                modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
                 color = Color.White,
-                fontSize = 12.sp,
-                maxLines = 2,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 2
             )
         }
     }
@@ -348,44 +520,30 @@ fun MyPostCard(post: Post) {
 
 @Composable
 fun StaggeredJourneyItem(index: Int, content: @Composable () -> Unit) {
-    var visible by remember { mutableStateOf(false) }
+    val animatable = remember { androidx.compose.animation.core.Animatable(50f) }
+    val alpha = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(Unit) {
-        delay(index * 60L)
-        visible = true
+        kotlinx.coroutines.delay(index * 100L)
+        animatable.animateTo(0f, spring(stiffness = 300f, dampingRatio = 0.8f))
+        alpha.animateTo(1f, tween(500))
     }
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically { 50 } + fadeIn(),
-        modifier = Modifier.padding(horizontal = 16.dp)
-    ) {
-        content()
-    }
+    Box(modifier = Modifier.offset(y = animatable.value.dp).graphicsLayer { this.alpha = alpha.value }) { content() }
 }
 
 @Composable
-fun StatsCard(eventCount: Int, workshopCount: Int, chronicleCount: Int) {
+fun StatsCard(registrations: Int, enrollments: Int, chronicles: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-        elevation = CardDefaults.cardElevation(8.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
     ) {
-        Box(modifier = Modifier.background(
-            brush = Brush.verticalGradient(
-                colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
-            )
-        )) {
-            Row(
-                modifier = Modifier
-                    .padding(vertical = 32.dp, horizontal = 16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                StatItem(count = eventCount, label = "Events", icon = "🏛")
-                StatItem(count = workshopCount, label = "Workshops", icon = "🎨")
-                StatItem(count = chronicleCount, label = "Posts", icon = "📜")
-            }
+        Row(
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            StatItem(count = registrations, label = "Events", icon = "🏛")
+            StatItem(count = enrollments, label = "Workshops", icon = "🏺")
+            StatItem(count = chronicles, label = "Stories", icon = "📜")
         }
     }
 }
@@ -393,9 +551,9 @@ fun StatsCard(eventCount: Int, workshopCount: Int, chronicleCount: Int) {
 @Composable
 fun StatItem(count: Int, label: String, icon: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(icon, fontSize = 18.sp)
-        Text(text = count.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-        Text(text = label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), fontSize = 8.sp)
+        Text(icon, fontSize = 24.sp)
+        Text(count.toString(), style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.ExtraBold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
     }
 }
 
@@ -403,89 +561,79 @@ fun StatItem(count: Int, label: String, icon: String) {
 fun SectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.ExtraBold,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(vertical = 8.dp)
+        modifier = modifier
     )
 }
 
 @Composable
-fun TimelineJourneyItem(title: String, subtitle: String, timestamp: com.google.firebase.Timestamp?, status: String, accentColor: Color, isLast: Boolean) {
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        Box(modifier = Modifier.width(32.dp).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
-            val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-            Canvas(modifier = Modifier.fillMaxHeight()) {
-                if (!isLast) {
-                    drawLine(
-                        color = lineColor,
-                        start = Offset(size.width / 2, 30.dp.toPx()),
-                        end = Offset(size.width / 2, size.height),
-                        strokeWidth = 2.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                    )
-                }
-            }
+fun TimelineJourneyItem(
+    title: String,
+    subtitle: String,
+    timestamp: Timestamp?,
+    status: String,
+    accentColor: Color,
+    isLast: Boolean
+) {
+    Row(modifier = Modifier.padding(horizontal = 24.dp).height(IntrinsicSize.Min)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(
-                modifier = Modifier.padding(top = 12.dp).size(16.dp),
-                color = accentColor,
+                modifier = Modifier.size(12.dp),
                 shape = CircleShape,
-                border = androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.background)
-            ) { }
+                color = accentColor,
+                border = BorderStroke(3.dp, MaterialTheme.colorScheme.background)
+            ) {}
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .weight(1f)
+                        .background(accentColor.copy(alpha = 0.2f), shape = RoundedCornerShape(1.dp))
+                )
+            }
         }
-
-        Spacer(modifier = Modifier.width(8.dp))
+        
+        Spacer(Modifier.width(24.dp))
+        
         JourneyItemCard(title, subtitle, timestamp, status, accentColor)
     }
 }
 
 @Composable
-fun JourneyItemCard(title: String, subtitle: String, timestamp: com.google.firebase.Timestamp?, status: String, accentColor: Color) {
+fun JourneyItemCard(
+    title: String,
+    subtitle: String,
+    timestamp: Timestamp?,
+    status: String,
+    accentColor: Color
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.2f))
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                color = accentColor.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(if (status == "Enrolled") "🎨" else "🏛", fontSize = 18.sp)
-                }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Surface(
-                    color = if (status == "Enrolled") Color(0xFF2E7D32).copy(alpha = 0.1f) else accentColor.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Text(
-                        text = status.uppercase(),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = if (status == "Enrolled") Color(0xFF2E7D32) else accentColor,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp
-                    )
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                if (timestamp != null) {
+                    val date = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(timestamp.toDate())
+                    Text(date, style = MaterialTheme.typography.labelSmall, color = Color.Gray.copy(alpha = 0.6f))
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+            }
+            Surface(
+                color = accentColor.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(50)
+            ) {
                 Text(
-                    text = TimeUtils.relativeTime(timestamp?.toDate()),
-                    style = MaterialTheme.typography.labelSmall, 
-                    color = MaterialTheme.colorScheme.outline,
-                    fontSize = 10.sp
+                    status,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -495,36 +643,25 @@ fun JourneyItemCard(title: String, subtitle: String, timestamp: com.google.fireb
 @Composable
 fun EmptyJourneyState(onExploreClick: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("🏺", fontSize = 80.sp)
-        Spacer(modifier = Modifier.height(24.dp))
+        Text("🏛", fontSize = 64.sp)
+        Spacer(Modifier.height(24.dp))
+        Text("Your journey hasn't begun...", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(
-            "Your cultural journey starts here",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+            "Every legend starts with a single step. Discover your first art form or event.",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.Gray
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "Explore an art form and begin learning to see your journey unfold!",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(Modifier.height(32.dp))
         Button(
             onClick = onExploreClick,
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Explore Arts", fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text("BEGIN EXPLORING")
         }
     }
 }

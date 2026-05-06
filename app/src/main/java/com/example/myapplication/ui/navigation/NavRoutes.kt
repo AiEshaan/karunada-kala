@@ -18,6 +18,8 @@ sealed class NavRoutes(val route: String) {
     object SignUp : NavRoutes("signup")
     object Detail : NavRoutes("detail/{name}/{description}/{imageUrl}/{artistId}/{category}")
     object ArtistDetail : NavRoutes("artist_detail/{artistId}")
+    object EventDetail : NavRoutes("event_detail/{id}/{title}/{description}/{date}/{location}/{imageUrl}/{artType}/{lat}/{lng}")
+    object Notifications : NavRoutes("notifications")
 
     companion object {
         fun detail(name: String, description: String, imageUrl: String, artistId: String, category: String): String {
@@ -25,6 +27,9 @@ sealed class NavRoutes(val route: String) {
         }
         fun artistDetail(artistId: String): String {
             return "artist_detail/$artistId"
+        }
+        fun eventDetail(id: String, title: String, description: String, date: String, location: String, imageUrl: String, artType: String, lat: Double, lng: Double): String {
+            return "event_detail/$id/$title/$description/$date/$location/$imageUrl/$artType/$lat/$lng"
         }
         fun map(lat: Double? = null, lng: Double? = null): String {
             return if (lat != null && lng != null) "map?lat=$lat&lng=$lng" else "map"
@@ -43,6 +48,20 @@ sealed class NavRoutes(val route: String) {
                     encodedArtistId,
                     encodedCategory
                 )
+            )
+        }
+
+        fun navigateToEventDetail(navController: NavController, event: com.example.myapplication.data.model.Event) {
+            val encodedId = Uri.encode(event.id)
+            val encodedTitle = Uri.encode(event.title)
+            val encodedDescription = Uri.encode(event.description)
+            val encodedDate = Uri.encode(event.date)
+            val encodedLocation = Uri.encode(event.location)
+            val encodedImageUrl = Uri.encode(event.imageUrl)
+            val encodedArtType = Uri.encode(event.artType)
+            
+            navController.navigate(
+                "event_detail/$encodedId/$encodedTitle/$encodedDescription/$encodedDate/$encodedLocation/$encodedImageUrl/$encodedArtType/${event.lat}/${event.lng}"
             )
         }
 

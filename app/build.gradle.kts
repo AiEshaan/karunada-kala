@@ -73,7 +73,6 @@ dependencies {
     implementation(libs.play.services.location)
 
     // Firebase
-    implementation(platform(libs.androidx.compose.bom)) // BOM for Compose is already there, check Firebase BOM
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
@@ -97,6 +96,7 @@ dependencies {
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.gson)
 
     // Media3
     implementation(libs.androidx.media3.exoplayer)

@@ -1,6 +1,7 @@
 package com.example.myapplication.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.Event
 import com.example.myapplication.data.model.Registration
@@ -10,9 +11,9 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class EventViewModel : ViewModel() {
+class EventViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository()
+    private val repository = ArtRepository(application)
     private val userId: String
         get() = FirebaseAuth.getInstance().currentUser?.uid ?: "guest_user"
 
@@ -28,8 +29,58 @@ class EventViewModel : ViewModel() {
     private val _isRegistering = MutableStateFlow(false)
     val isRegistering: StateFlow<Boolean> = _isRegistering
 
+    private val _selectedFilter = MutableStateFlow("All")
+    val selectedFilter: StateFlow<String> = _selectedFilter
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+
+    val filteredEvents: StateFlow<List<Event>> = combine(_events, _selectedFilter) { events, filter ->
+        val calendar = java.util.Calendar.getInstance()
+        val sdf = java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault())
+        val currentYear = calendar.get(java.util.Calendar.YEAR)
+
+        when (filter) {
+            "All" -> events
+            "This Week" -> {
+                val sevenDaysLater = java.util.Calendar.getInstance()
+                sevenDaysLater.add(java.util.Calendar.DAY_OF_YEAR, 7)
+                events.filter { event ->
+                    try {
+                        val datePart = event.date.split("-")[0].trim()
+                        val eventDate = sdf.parse(datePart)
+                        eventDate?.let {
+                            val cal = java.util.Calendar.getInstance()
+                            cal.time = it
+                            cal.set(java.util.Calendar.YEAR, currentYear)
+                            cal.timeInMillis >= System.currentTimeMillis() && cal.timeInMillis <= sevenDaysLater.timeInMillis
+                        } ?: false
+                    } catch (e: Exception) { false }
+                }
+            }
+            "This Month" -> {
+                val thirtyDaysLater = java.util.Calendar.getInstance()
+                thirtyDaysLater.add(java.util.Calendar.DAY_OF_YEAR, 30)
+                events.filter { event ->
+                    try {
+                        val datePart = event.date.split("-")[0].trim()
+                        val eventDate = sdf.parse(datePart)
+                        eventDate?.let {
+                            val cal = java.util.Calendar.getInstance()
+                            cal.time = it
+                            cal.set(java.util.Calendar.YEAR, currentYear)
+                            cal.timeInMillis >= System.currentTimeMillis() && cal.timeInMillis <= thirtyDaysLater.timeInMillis
+                        } ?: false
+                    } catch (e: Exception) { false }
+                }
+            }
+            else -> events.filter { it.artType.equals(filter, ignoreCase = true) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setFilter(filter: String) {
+        _selectedFilter.value = filter
+    }
 
     fun fetchEvents() {
         repository.observeCollection("events", Event::class.java)

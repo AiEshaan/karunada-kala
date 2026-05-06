@@ -1,10 +1,10 @@
 package com.example.myapplication.ui.screens
 
-import android.net.Uri
-import androidx.compose.animation.Animatable
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -68,7 +68,7 @@ fun DetailScreen(
     var entered by remember { mutableStateOf(false) }
     
     // 3D Flip State
-    val rotation = remember { androidx.compose.animation.core.Animatable(0f) }
+    val rotation = remember { Animatable(0f) }
 
     val entranceScale by animateFloatAsState(
         targetValue = if (entered) 1f else 0.8f,
@@ -80,7 +80,7 @@ fun DetailScreen(
         entered = true
         viewModel.addViewedArt(name)
         viewModel.generateAiDescriptionIfNeeded(name, description, category)
-        if (artistId != "none" && artistId.isNotBlank()) {
+        if ((artistId != "none") && artistId.isNotBlank()) {
             artistViewModel.loadArtistById(artistId)
         }
     }
@@ -176,7 +176,7 @@ fun DetailScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("📜", fontSize = 48.sp)
                                 Spacer(Modifier.height(16.dp))
-                                Text(
+                                TypewriterText(
                                     text = artLegends[name] ?: "Unrolling the ancient story...",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontStyle = FontStyle.Italic,
@@ -231,20 +231,29 @@ fun DetailScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // 🎧 AUDIO NARRATIVE (Artisan Voice)
-            AudioNarrativeCard(
-                audioUrl = dynamicAudioUrl,
-                title = name
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
+            if (currentArtForm?.audioUrl?.isNotBlank() == true) {
+                AudioNarrativeCard(
+                    audioUrl = currentArtForm.audioUrl,
+                    title = name
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+            }
 
             // 🎥 VIDEO B-ROLL
-            VideoBrollCard(videoUrl = dynamicVideoUrl)
-
-            Spacer(modifier = Modifier.height(32.dp))
+            if (currentArtForm?.videoUrl?.isNotBlank() == true) {
+                VideoBrollCard(videoUrl = currentArtForm.videoUrl)
+                Spacer(modifier = Modifier.height(32.dp))
+            }
 
             // 👨‍🏫 MENTORSHIP SECTION
-            MentorshipCard(artist = selectedArtist)
+            MentorshipCard(
+                artist = selectedArtist,
+                onManualRequest = {
+                    selectedArtist?.let { artist ->
+                        artistViewModel.requestMentorship(artist.id, name)
+                    }
+                }
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -257,13 +266,94 @@ fun DetailScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            Spacer(modifier = Modifier.height(48.dp))
+            // 🎭 RELATED ART FORMS
+            val relatedArts = remember(name, category) { viewModel.getRelatedArts(name, category) }
+            if (relatedArts.isNotEmpty()) {
+                Text(
+                    "🎭 Related Art Forms",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    relatedArts.forEach { art ->
+                        Card(
+                            modifier = Modifier
+                                .width(160.dp)
+                                .height(200.dp)
+                                .clip(RoundedCornerShape(16.dp)),
+                            onClick = { NavRoutes.navigateToDetail(navController, art) }
+                        ) {
+                            Box {
+                                AsyncImage(
+                                    model = art.imageUrl,
+                                    contentDescription = art.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.7f))))
+                                )
+                                Text(
+                                    art.name,
+                                    modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(48.dp))
+            }
         }
     }
 }
 
 @Composable
-fun MentorshipCard(artist: com.example.myapplication.data.model.Artist?) {
+fun TypewriterText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+    fontStyle: FontStyle? = null,
+    textAlign: TextAlign? = null,
+    lineHeight: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
+    color: Color = Color.Unspecified
+) {
+    var textToDisplay by remember { mutableStateOf("") }
+
+    LaunchedEffect(text) {
+        textToDisplay = ""
+        text.forEach { char ->
+            textToDisplay += char
+            kotlinx.coroutines.delay(30)
+        }
+    }
+
+    Text(
+        text = textToDisplay,
+        style = style,
+        modifier = modifier,
+        fontStyle = fontStyle,
+        textAlign = textAlign,
+        lineHeight = lineHeight,
+        color = color
+    )
+}
+
+@Composable
+fun MentorshipCard(artist: com.example.myapplication.data.model.Artist?, onManualRequest: () -> Unit = {}) {
     val localContext = LocalContext.current
     var isRequested by remember { mutableStateOf(false) }
 
@@ -301,6 +391,7 @@ fun MentorshipCard(artist: com.example.myapplication.data.model.Artist?) {
                 onClick = {
                     if (!isRequested) {
                         isRequested = true
+                        onManualRequest()
                         android.widget.Toast.makeText(localContext, "Mentorship request sent to the Guru! 🙏", android.widget.Toast.LENGTH_LONG).show()
                     }
                 },

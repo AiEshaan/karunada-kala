@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -50,7 +51,9 @@ import com.google.android.gms.maps.CameraUpdateFactory
 
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
+import com.example.myapplication.R
 import com.google.maps.android.compose.clustering.Clustering
 
 @OptIn(MapsComposeExperimentalApi::class)
@@ -61,7 +64,7 @@ fun MapScreen(
     eventViewModel: EventViewModel = viewModel(),
     workshopViewModel: WorkshopViewModel = viewModel(),
     initialLat: Double? = null,
-    initialLng: Double? = null
+    initialLng: Double? = null,
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -71,9 +74,8 @@ fun MapScreen(
     val filterType by mapViewModel.selectedFilter.collectAsState()
     val showOnlyToday by mapViewModel.showOnlyToday.collectAsState()
     val isLoading by mapViewModel.isLoading.collectAsState()
-    val userLocation by mapViewModel.userLocation.collectAsState()
-    val nearestItem by mapViewModel.nearestItem.collectAsState()
     val discoveryAlert by mapViewModel.discoveryAlert.collectAsState()
+    val nowActiveCount by mapViewModel.nowActiveCount.collectAsState()
     
     var selectedItem by remember { mutableStateOf<MapItem?>(null) }
     
@@ -91,20 +93,25 @@ fun MapScreen(
     }
 
     val mapProperties by remember {
-        mutableStateOf(MapProperties(isMyLocationEnabled = false, mapType = MapType.NORMAL))
+        mutableStateOf(
+            MapProperties(
+                isMyLocationEnabled = false,
+                mapType = MapType.NORMAL,
+                mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
+            )
+        )
     }
 
     // Handle deep link or initial position
     LaunchedEffect(initialLat, initialLng, mapItems) {
-        if (initialLat != null && initialLng != null) {
+        if ((initialLat != null) && (initialLng != null)) {
             val target = LatLng(initialLat, initialLng)
             cameraPositionState.animate(
                 update = CameraUpdateFactory.newLatLngZoom(target, 14f),
                 durationMs = 1000
             )
             // Auto-select the deep-linked item if it exists in the list
-            val item = mapItems.find { it.lat == initialLat && it.lng == initialLng }
-            if (item != null) {
+            mapItems.find { it.lat == initialLat && it.lng == initialLng }?.let { item ->
                 selectedItem = item
             }
         } else if (mapItems.isEmpty()) {
@@ -151,8 +158,8 @@ fun MapScreen(
                         clusterItemContent = { item ->
                             val isDeepLinked = item.lat == initialLat && item.lng == initialLng
                             val markerColor = when (item.type) {
-                                "Artists" -> Color(0xFF8B4513)   // Warm brown
-                                "Events" -> Color(0xFFD4AF37)    // Gold
+                                "Artists" -> Color(0xFFD4AF37)   // Gold
+                                "Events" -> Color(0xFFBF4F26)    // Terracotta
                                 "Workshops" -> Color(0xFF008080) // Teal
                                 else -> MaterialTheme.colorScheme.primary
                             }
@@ -162,10 +169,26 @@ fun MapScreen(
                                 "Workshops" -> "🧑‍🏫"
                                 else -> "📍"
                             }
+                            
+                            val isLive = (item.data as? Event)?.date?.contains("2024", ignoreCase = true) == true // Simple check for "Now"
+
+                            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                            val pulseScale by infiniteTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = if (isLive) 1.2f else 1f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1000, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "pulseScale"
+                            )
 
                             // Standard Compose UI for the marker icon
                             Surface(
-                                modifier = Modifier.size(if (isDeepLinked) 44.dp else 36.dp),
+                                modifier = Modifier.size(if (isDeepLinked) 44.dp else 36.dp).graphicsLayer {
+                                    scaleX = if (isLive) pulseScale else 1f
+                                    scaleY = if (isLive) pulseScale else 1f
+                                },
                                 shape = CircleShape,
                                 color = markerColor,
                                 tonalElevation = if (isDeepLinked) 12.dp else 4.dp,
@@ -272,7 +295,7 @@ fun MapScreen(
             KalaFilterChip(
                 selected = showOnlyToday,
                 onClick = { mapViewModel.toggleNowFilter() },
-                label = "Happening Now 🔥"
+                label = if (nowActiveCount > 0) "Happening Now ($nowActiveCount) 🔥" else "Happening Now 🔥"
             )
             
             val filters = listOf("All", "Artists", "Events", "Workshops")
@@ -373,20 +396,28 @@ fun ArtistMapUI(artist: Artist, navController: NavController, onClose: () -> Uni
     val context = LocalContext.current
     Column(modifier = Modifier.padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("🎭", fontSize = 24.sp)
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFD4AF37).copy(alpha = 0.1f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("🎭", fontSize = 24.sp)
+                }
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(artist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(artist.artType, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text(artist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                Text(artist.artType, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
             }
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null) }
         }
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             KalaActionButton(
-                text = "Profile",
+                text = "Visit Profile",
                 onClick = { navController.navigate(NavRoutes.artistDetail(artist.id)) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1.3f)
             )
             OutlinedButton(
                 onClick = {
@@ -399,8 +430,8 @@ fun ArtistMapUI(artist: Artist, navController: NavController, onClose: () -> Uni
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF25D366))
             ) {
                 Icon(Icons.Default.Phone, null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("WhatsApp")
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("WhatsApp", fontSize = 12.sp)
             }
         }
     }

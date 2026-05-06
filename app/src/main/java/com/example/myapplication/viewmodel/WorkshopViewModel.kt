@@ -1,6 +1,7 @@
 package com.example.myapplication.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.Workshop
 import com.example.myapplication.data.model.Enrollment
@@ -10,9 +11,9 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class WorkshopViewModel : ViewModel() {
+class WorkshopViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository()
+    private val repository = ArtRepository(application)
 
     private val _workshops = MutableStateFlow<List<Workshop>>(emptyList())
     val workshops: StateFlow<List<Workshop>> = _workshops

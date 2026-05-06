@@ -20,8 +20,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,15 +51,20 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.myapplication.R
+import com.example.myapplication.core.analytics.AnalyticsHelper
 import com.example.myapplication.data.model.ArtForm
 import com.example.myapplication.ui.components.ArtCard
 import com.example.myapplication.ui.components.ArtCardShimmer
+import com.example.myapplication.ui.components.ArtOfTheDayCard
 import com.example.myapplication.ui.components.KalaFilterChip
+import com.example.myapplication.ui.components.entranceAnimation
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.viewmodel.ArtViewModel
 import com.example.myapplication.viewmodel.ChatViewModel
 import com.example.myapplication.viewmodel.JourneyViewModel
+import com.example.myapplication.viewmodel.WorkshopViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -67,7 +76,9 @@ private const val TAG = "ExploreScreen"
 fun ExploreScreen(
     navController: NavController,
     viewModel: ArtViewModel = viewModel(),
-    chatViewModel: ChatViewModel = viewModel()
+    chatViewModel: ChatViewModel = viewModel(),
+    journeyViewModel: JourneyViewModel = viewModel(),
+    workshopViewModel: WorkshopViewModel = viewModel()
 ) {
     val artList by viewModel.artForms.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -76,6 +87,10 @@ fun ExploreScreen(
     val recentSearches by viewModel.recentSearches.collectAsState()
     val artLegends by viewModel.artLegends.collectAsState()
     val isGeneratingLegend by viewModel.isGeneratingLegend.collectAsState()
+    val artOfTheDay by viewModel.artOfTheDay.collectAsState()
+
+    val enrollments by journeyViewModel.enrollments.collectAsState()
+    val registrations by journeyViewModel.registrations.collectAsState()
 
     var selectedCategory by remember { mutableStateOf("All") }
     val listState = rememberLazyListState()
@@ -103,8 +118,13 @@ fun ExploreScreen(
         derivedStateOf { listState.firstVisibleItemIndex }
     }
 
+    val context = LocalContext.current
+    val analytics = remember { AnalyticsHelper(context) }
+
     LaunchedEffect(Unit) {
         viewModel.fetchArtForms()
+        journeyViewModel.fetchJourney()
+        analytics.logScreenView("Explore")
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -113,102 +133,129 @@ fun ExploreScreen(
         Scaffold(
             containerColor = Color.Transparent,
         ) { padding ->
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = PaddingValues(bottom = 32.dp)
+            PullToRefreshBox(
+                isRefreshing = isLoading,
+                onRefresh = { viewModel.fetchArtForms() },
+                modifier = Modifier.padding(padding)
             ) {
-                item {
-                    val alpha by remember {
-                        derivedStateOf {
-                            if (firstItemIndex == 0) {
-                                (1f - (firstItemScrollOffset / 500f)).coerceIn(0f, 1f)
-                            } else 0f
-                        }
-                    }
-                    val translationY by remember {
-                        derivedStateOf {
-                            if (firstItemIndex == 0) {
-                                (firstItemScrollOffset * 0.3f)
-                            } else 0f
-                        }
-                    }
-
-                    Box(modifier = Modifier.graphicsLayer {
-                        this.alpha = alpha
-                        this.translationY = translationY
-                    }) {
-                        HeaderSection(
-                            isAiAssistantEnabled = isAiAssistantEnabled,
-                            onAiAssistantToggle = { isAiAssistantEnabled = it }
-                        )
-                    }
-                }
-
-                item {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        SearchSection(
-                            searchQuery = searchQuery,
-                            onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-                            isSearchFocused = isSearchFocused,
-                            onFocusChange = { isSearchFocused = it },
-                            suggestions = suggestions,
-                            recentSearches = recentSearches,
-                            onSuggestionClick = { suggestion ->
-                                viewModel.onSearchQueryChange(suggestion)
-                                viewModel.addRecentSearch(suggestion)
-                            }
-                        )
-
-                        CategoriesSection(
-                            selectedCategory = selectedCategory,
-                            onCategorySelect = { selectedCategory = it }
-                        )
-                    }
-                }
-
-                if (artList.isNotEmpty() && !isLoading) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
                     item {
-                        RecommendedSection(
-                            artList = artList,
-                            navController = navController,
-                            onLikeToggle = { viewModel.toggleLike(it) }
-                        )
-                    }
-                }
-
-                // 4. Staggered Art Grid
-                if (isLoading && artList.isEmpty()) {
-                    items(4) { ArtCardShimmer() }
-                } else {
-                    itemsIndexed(filteredList) { index, art ->
-                        if (index >= filteredList.size - 1 && searchQuery.isEmpty() && selectedCategory == "All") {
-                            LaunchedEffect(Unit) {
-                                viewModel.loadMoreArtForms()
+                        val alpha by remember {
+                            derivedStateOf {
+                                if (firstItemIndex == 0) {
+                                    (1f - (firstItemScrollOffset / 500f)).coerceIn(0f, 1f)
+                                } else 0f
                             }
                         }
-                        StaggeredAnimatedItem(index = index) {
-                            ArtCard(
-                                art = art,
-                                onNavigate = {
-                                    viewModel.addRecentSearch(art.name)
-                                    NavRoutes.navigateToDetail(navController, art)
-                                },
-                                onLikeToggle = {
-                                    viewModel.toggleLike(art.id)
-                                },
-                                onShowLegend = {
-                                    selectedArtForLegend = art
-                                    viewModel.generateLegend(art.name)
-                                    showLegendSheet = true
-                                }
+                        val translationY by remember {
+                            derivedStateOf {
+                                if (firstItemIndex == 0) {
+                                    (firstItemScrollOffset * 0.3f)
+                                } else 0f
+                            }
+                        }
+
+                        Box(modifier = Modifier.graphicsLayer {
+                            this.alpha = alpha
+                            this.translationY = translationY
+                        }) {
+                            HeaderSection(
+                                isAiAssistantEnabled = isAiAssistantEnabled,
+                                onAiAssistantToggle = { isAiAssistantEnabled = it },
+                                onNotificationClick = { navController.navigate(NavRoutes.Notifications.route) }
                             )
                         }
                     }
-                }
 
-                item {
-                    SanghaSection(onJoinClick = { navController.navigate(NavRoutes.Community.route) })
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            SearchSection(
+                                searchQuery = searchQuery,
+                                onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                                isSearchFocused = isSearchFocused,
+                                onFocusChange = { isSearchFocused = it },
+                                suggestions = suggestions,
+                                recentSearches = recentSearches,
+                                onSuggestionClick = { suggestion ->
+                                    viewModel.onSearchQueryChange(suggestion)
+                                    viewModel.addRecentSearch(suggestion)
+                                }
+                            )
+
+                            CategoriesSection(
+                                selectedCategory = selectedCategory,
+                                onCategorySelect = { selectedCategory = it }
+                            )
+                        }
+                    }
+
+                    item {
+                        artOfTheDay?.let { art ->
+                            ArtOfTheDayCard(
+                                art = art,
+                                onClick = { NavRoutes.navigateToDetail(navController, art) }
+                            )
+                        }
+                    }
+
+                    // NEW: Continue Journey Section
+                    if (enrollments.isNotEmpty() || registrations.isNotEmpty()) {
+                        item {
+                            ContinueJourneySection(
+                                enrollments = enrollments,
+                                registrations = registrations,
+                                navController = navController
+                            )
+                        }
+                    }
+
+                    if (artList.isNotEmpty() && !isLoading) {
+                        item {
+                            RecommendedSection(
+                                artList = artList,
+                                navController = navController,
+                                onLikeToggle = { viewModel.toggleLike(it) }
+                            )
+                        }
+                    }
+
+                    // 4. Staggered Art Grid
+                    if (isLoading && artList.isEmpty()) {
+                        items(4) { ArtCardShimmer() }
+                    } else {
+                        itemsIndexed(filteredList) { index, art ->
+                            if (index >= filteredList.size - 1 && searchQuery.isEmpty() && selectedCategory == "All") {
+                                LaunchedEffect(Unit) {
+                                    viewModel.loadMoreArtForms()
+                                }
+                            }
+                            StaggeredAnimatedItem(index = index) {
+                                ArtCard(
+                                    art = art,
+                                    onNavigate = {
+                                        viewModel.addRecentSearch(art.name)
+                                        NavRoutes.navigateToDetail(navController, art)
+                                    },
+                                    onLikeToggle = {
+                                        viewModel.toggleLike(art.id)
+                                    },
+                                    onShowLegend = {
+                                        selectedArtForLegend = art
+                                        viewModel.generateLegend(art.name)
+                                        showLegendSheet = true
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        SanghaSection(onJoinClick = { navController.navigate(NavRoutes.Community.route) })
+                    }
                 }
             }
         }
@@ -296,8 +343,14 @@ fun ExploreScreen(
 @Composable
 fun HeaderSection(
     isAiAssistantEnabled: Boolean,
-    onAiAssistantToggle: (Boolean) -> Unit
+    onAiAssistantToggle: (Boolean) -> Unit,
+    onNotificationClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val notificationRepository = remember { com.example.myapplication.data.repository.NotificationRepository(context) }
+    val notifications by notificationRepository.notifications.collectAsState(initial = emptyList())
+    val unreadCount = notifications.count { !it.isRead }
+
     val infiniteTransition = rememberInfiniteTransition(label = "scrollIndicator")
     val offset by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -323,17 +376,31 @@ fun HeaderSection(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                "HERITAGE OF KARNATAKA",
+                stringResource(R.string.heritage_subtitle),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.weight(1f)
             )
+            
+            IconButton(onClick = onNotificationClick) {
+                BadgedBox(
+                    badge = {
+                        if (unreadCount > 0) {
+                            Badge { Text(unreadCount.toString()) }
+                        }
+                    }
+                ) {
+                    Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
         }
 
         Text(
-            "Explore",
-            style = MaterialTheme.typography.displayLarge,
+            stringResource(R.string.explore),
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.offset(x = (-4).dp)
+            modifier = Modifier.offset(x = (-4).dp),
+            maxLines = 1
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -355,7 +422,7 @@ fun HeaderSection(
                 .padding(horizontal = 12.dp, vertical = 4.dp)
         ) {
             Text(
-                "Kala AI Assistant",
+                stringResource(R.string.kala_ai_assistant),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -378,7 +445,7 @@ fun HeaderSection(
             modifier = Modifier.fillMaxWidth().graphicsLayer { translationY = offset }
         ) {
             Text(
-                "SCROLL TO UNROLL",
+                stringResource(R.string.scroll_to_unroll),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                 letterSpacing = 1.sp
@@ -490,18 +557,25 @@ fun RecommendedSection(
     navController: NavController,
     onLikeToggle: (String) -> Unit
 ) {
-    Column(modifier = Modifier.padding(bottom = 32.dp)) {
+    Column(modifier = Modifier.padding(bottom = 32.dp).entranceAnimation(delay = 200)) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "RECOMMENDED FOR YOU ✨",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.secondary,
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Column {
+                Text(
+                    "RECOMMENDED FOR YOU ✨",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.secondary,
+                    letterSpacing = 1.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Trending in Karnataka this week",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
         }
 
@@ -536,6 +610,105 @@ fun RecommendedSection(
 }
 
 @Composable
+fun ContinueJourneySection(
+    enrollments: List<com.example.myapplication.data.model.Enrollment>,
+    registrations: List<com.example.myapplication.data.model.Registration>,
+    navController: NavController
+) {
+    Column(modifier = Modifier.padding(bottom = 32.dp).entranceAnimation(delay = 100)) {
+        Text(
+            "CONTINUE WHERE YOU LEFT 🏺",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            letterSpacing = 1.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp)
+        ) {
+            enrollments.forEach { enrollment ->
+                Card(
+                    modifier = Modifier
+                        .width(280.dp)
+                        .padding(horizontal = 8.dp)
+                        .clickable { /* Navigate to workshop detail or classroom */ },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+                ) {
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("🎓", fontSize = 20.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                "Enrolled in: ${enrollment.workshopTitle}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Workshop",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
+            
+            registrations.forEach { registration ->
+                Card(
+                    modifier = Modifier
+                        .width(280.dp)
+                        .padding(horizontal = 8.dp)
+                        .clickable { /* Navigate to event detail */ },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f))
+                ) {
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("🎪", fontSize = 20.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                registration.eventTitle,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                            Text(
+                                "Event coming up soon",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun StaggeredAnimatedItem(index: Int, content: @Composable () -> Unit) {
     val animatable = remember { Animatable(50f) }
     val alpha = remember { Animatable(0f) }
@@ -553,9 +726,10 @@ fun GrainOverlay() {
     val grainPoints = remember {
         val points = mutableListOf<Offset>()
         val step = 12 // Increased step for performance
+        val random = java.util.Random(42) // Use a fixed seed for stability
         for (x in 0..2000 step step) {
             for (y in 0..3000 step step) {
-                if ((0..10).random() > 8) {
+                if (random.nextInt(11) > 8) {
                     points.add(Offset(x.toFloat(), y.toFloat()))
                 }
             }
@@ -563,11 +737,12 @@ fun GrainOverlay() {
         points
     }
 
+    val color = MaterialTheme.colorScheme.onBackground
     Canvas(modifier = Modifier.fillMaxSize().alpha(0.08f)) {
         drawPoints(
             points = grainPoints,
             pointMode = PointMode.Points,
-            color = Color.Black,
+            color = color,
             strokeWidth = 1f
         )
     }
@@ -576,12 +751,12 @@ fun GrainOverlay() {
 @Composable
 fun SanghaSection(onJoinClick: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Become a Guardian", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.become_guardian), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(12.dp))
-        Text("Join the Sangha and contribute to our living heritage archives.", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Text(stringResource(R.string.sangha_description), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
         Spacer(modifier = Modifier.height(24.dp))
         TextButton(onClick = onJoinClick, modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(4.dp))) {
-            Text("JOIN THE SANGHA", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.join_sangha), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
         }
@@ -636,8 +811,8 @@ fun KalaAiFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            Text("ASK KALA", style = MaterialTheme.typography.labelLarge, color = Color.White, fontSize = 10.sp)
+            Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Text(stringResource(R.string.ask_kala), style = MaterialTheme.typography.labelLarge, color = Color.White, fontSize = 10.sp)
         }
     }
 }
@@ -710,7 +885,7 @@ fun ChatBottomSheet(
                                 if (!msg.isUser) {
                                     Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                                         IconButton(onClick = { tts?.speak(msg.text, TextToSpeech.QUEUE_FLUSH, null, "KalaSpeak") }, modifier = Modifier.size(24.dp)) {
-                                            Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
+                                            Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
                                         }
                                         if (msg.text.contains("day", ignoreCase = true) || msg.text.contains("itinerary", ignoreCase = true) || msg.text.contains("plan", ignoreCase = true)) {
                                             IconButton(onClick = { journeyViewModel.addManualEntry("AI Cultural Itinerary", "Planned by Kala") }, modifier = Modifier.size(24.dp)) {

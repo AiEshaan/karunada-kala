@@ -22,3 +22,10 @@ val InkCharcoal = ArtBrand
 val TerraCotta = ArtTerra
 val AntiqueGold = ArtClay
 val ErrorCrimson = Color(0xFF7B241C)
+
+// Dark Palette
+val ArtBrandDark = Color(0xFF8FBD9F) // Sage Green
+val ArtTerraDark = Color(0xFFE8A878) // Warm Clay
+val ArtClayDark = Color(0xFFD4C5A9)  // Aged Wood
+val ArtBGDark = Color(0xFF1A1612)    // Aged Walnut
+val ArtSurfaceDark = Color(0xFF2A241E) // Dark Leather

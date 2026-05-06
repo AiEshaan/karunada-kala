@@ -60,7 +60,11 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         _sortOrder.value = order
     }
 
-    private fun observePosts() {
+    fun refresh() {
+        observePosts()
+    }
+
+    fun observePosts() {
         repository.observePosts()
             .onStart { _uiState.value = UiState.Loading }
             .onEach { postList ->
@@ -130,7 +134,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
                 postId = postId,
                 userId = userId,
                 reason = reason,
-                timestamp = Timestamp.now()
+                timestamp = Timestamp.now(),
             )
             repository.reportPost(report)
             hidePost(postId)

@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">Karunada Kala</string>
+    <string name="explore">Explore</string>
+    <string name="map">Map</string>
+    <string name="events">Events</string>
+    <string name="chronicles">Chronicles</string>
+    <string name="my_journey">My Journey</string>
+    <string name="heritage_subtitle">HERITAGE OF KARNATAKA</string>
+    <string name="search_archives">Search the archives...</string>
+    <string name="scroll_to_unroll">SCROLL TO UNROLL</string>
+    <string name="kala_ai_assistant">Kala AI Assistant</string>
+    <string name="ask_kala">ASK KALA</string>
+    <string name="join_sangha">JOIN THE SANGHA</string>
+    <string name="become_guardian">Become a Guardian</string>
+    <string name="sangha_description">Join the Sangha and contribute to our living heritage archives.</string>
 </resources>

@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">ಕರುನಾಡ ಕಲೆ</string>
+    <string name="explore">ಅನ್ವೇಷಿಸಿ</string>
+    <string name="map">ನಕ್ಷೆ</string>
+    <string name="events">ಕಾರ್ಯಕ್ರಮಗಳು</string>
+    <string name="chronicles">ಚರಿತ್ರೆ</string>
+    <string name="my_journey">ನನ್ನ ಪಯಣ</string>
+    <string name="heritage_subtitle">ಕರ್ನಾಟಕದ ಪರಂಪರೆ</string>
+    <string name="search_archives">ಹುಡುಕಿ...</string>
+    <string name="scroll_to_unroll">ಸುತ್ತು ಬಿಚ್ಚಲು ಸ್ಕ್ರಾಲ್ ಮಾಡಿ</string>
+    <string name="kala_ai_assistant">ಕಲಾ AI ಸಹಾಯಕ</string>
+    <string name="ask_kala">ಕಲೆಯನ್ನು ಕೇಳಿ</string>
+    <string name="join_sangha">ಸಂಘಕ್ಕೆ ಸೇರಿ</string>
+    <string name="become_guardian">ಪಾಲಕರಾಗಿ</string>
+    <string name="sangha_description">ನಮ್ಮ ಜೀವಂತ ಪರಂಪರೆಯ ಆರ್ಕೈವ್‌ಗಳಿಗೆ ಸಂಘ ಸೇರಿ ಕೊಡುಗೆ ನೀಡಿ.</string>
+</resources>

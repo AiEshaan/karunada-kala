@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = ArtRepository()
+    private val repository = ArtRepository(application)
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
     private val tag = "MapViewModel"
 
@@ -54,21 +54,48 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         var all = artists + events + workshops
         
         if (showToday) {
-            val today = try {
-                java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date())
-            } catch (e: Exception) {
-                ""
+            val calendar = java.util.Calendar.getInstance()
+            val dateFormat = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+            
+            val validDates = mutableListOf<String>()
+            for (i in 0..7) {
+                validDates.add(dateFormat.format(calendar.time))
+                calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
             }
-            if (today.isNotEmpty()) {
-                all = all.filter { item ->
-                    ((item.data as? Event)?.date?.contains(today, ignoreCase = true) == true) ||
-                    ((item.data as? Workshop)?.date?.contains(today, ignoreCase = true) == true)
-                }
+
+            all = all.filter { item ->
+                item.type == "Artists" || 
+                ((item.data as? Event)?.date?.let { dateStr -> validDates.any { dateStr.contains(it, ignoreCase = true) } } == true) ||
+                ((item.data as? Workshop)?.date?.let { dateStr -> validDates.any { dateStr.contains(it, ignoreCase = true) } } == true)
             }
         }
         
         if (filter == "All") all else all.filter { it.type.equals(filter, ignoreCase = true) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val nowActiveCount: StateFlow<Int> = combine(
+        _artists,
+        _events,
+        _workshops
+    ) { artists, events, workshops ->
+        val calendar = java.util.Calendar.getInstance()
+        val dateFormat = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+        
+        val validDates = mutableListOf<String>()
+        for (i in 0..7) {
+            validDates.add(dateFormat.format(calendar.time))
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+
+        val activeEvents = events.count { item ->
+            (item.data as? Event)?.date?.let { dateStr -> validDates.any { dateStr.contains(it, ignoreCase = true) } } == true
+        }
+        val activeWorkshops = workshops.count { item ->
+            (item.data as? Workshop)?.date?.let { dateStr -> validDates.any { dateStr.contains(it, ignoreCase = true) } } == true
+        }
+        
+        activeEvents + activeWorkshops
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     fun fetchData() {
         _isLoading.value = true

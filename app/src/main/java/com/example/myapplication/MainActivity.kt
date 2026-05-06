@@ -245,6 +245,22 @@ fun KarunadaKalaApp() {
                 val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
                 ArtistDetailScreen(artistId)
             }
+            composable(NavRoutes.EventDetail.route) { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("id") ?: ""
+                val title = backStackEntry.arguments?.getString("title") ?: ""
+                val description = backStackEntry.arguments?.getString("description") ?: ""
+                val date = backStackEntry.arguments?.getString("date") ?: ""
+                val location = backStackEntry.arguments?.getString("location") ?: ""
+                val imageUrl = backStackEntry.arguments?.getString("imageUrl") ?: ""
+                val artType = backStackEntry.arguments?.getString("artType") ?: ""
+                val lat = backStackEntry.arguments?.getString("lat")?.toDoubleOrNull() ?: 0.0
+                val lng = backStackEntry.arguments?.getString("lng")?.toDoubleOrNull() ?: 0.0
+                
+                EventDetailScreen(id, title, description, date, location, imageUrl, artType, lat, lng, navController)
+            }
+            composable(NavRoutes.Notifications.route) {
+                NotificationScreen(navController)
+            }
         }
     }
 }

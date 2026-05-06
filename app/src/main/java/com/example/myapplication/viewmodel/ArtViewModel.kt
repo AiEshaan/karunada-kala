@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository()
+    private val repository = ArtRepository(application)
     private val geminiRepository = GeminiRepository()
     private val searchPrefs = SearchPrefsRepository(application)
 
@@ -29,7 +29,7 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
     private val _recentSearches = MutableStateFlow<List<String>>(emptyList())
     val recentSearches: StateFlow<List<String>> = _recentSearches
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(value = false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
     private val _viewedArts = MutableStateFlow<List<String>>(emptyList())
@@ -42,6 +42,16 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isGeneratingLegend = MutableStateFlow(false)
     val isGeneratingLegend = _isGeneratingLegend.asStateFlow()
+
+    val artOfTheDay: StateFlow<ArtForm?> = _artForms.map { list ->
+        if (list.isEmpty()) return@map null
+        val calendar = java.util.Calendar.getInstance()
+        val dayOfYear = calendar[java.util.Calendar.DAY_OF_YEAR]
+        val year = calendar[java.util.Calendar.YEAR]
+        // Deterministic pick based on date
+        val index = (dayOfYear + year) % list.size
+        list[index]
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val legendCache = mutableMapOf<String, String>()
 
@@ -56,7 +66,7 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
             searchPrefs.recentSearchesFlow.collectLatest { searches ->
                 _recentSearches.value = searches
                 if (_searchQuery.value.isEmpty()) {
-                    _suggestions.value = (searches + trendingItemsList).distinct().take(5)
+                    _suggestions.value = (searches + trendingItemsList).asSequence().distinct().take(5).toList()
                 }
             }
         }
@@ -120,7 +130,7 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
                 // Fetch AI suggestions if few local matches
                 viewModelScope.launch {
                     geminiRepository.suggestSearchQueries(newQuery).onSuccess { aiSuggestions ->
-                        _suggestions.value = (localMatches + aiSuggestions).distinct().take(5)
+                        _suggestions.value = (localMatches + aiSuggestions).asSequence().distinct().take(5).toList()
                     }
                 }
             } else {
@@ -156,7 +166,7 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun generateAiDescriptionIfNeeded(name: String, currentDescription: String, category: String) {
-        if (currentDescription.length >= 50 || _aiDescriptions.value.containsKey(name)) {
+        if ((currentDescription.length >= 50) || _aiDescriptions.value.containsKey(name)) {
             if (!_artLegends.value.containsKey(name)) {
                 viewModelScope.launch {
                     geminiRepository.generatePersonalizedLegend(name).onSuccess { legend ->
@@ -176,5 +186,11 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
                 _artLegends.update { it + (name to legend) }
             }
         }
+    }
+
+    fun getRelatedArts(currentArtName: String, category: String): List<ArtForm> {
+        return _artForms.value.filter { 
+            it.category == category && it.name != currentArtName 
+        }.take(5)
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -165,8 +166,8 @@ fun ArtistDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             BadgeStat(value = "${currentArtist.experienceYears}+", label = "Years", Modifier.weight(1f))
-                            BadgeStat(value = "25+", label = "Works", Modifier.weight(1f))
-                            BadgeStat(value = "100+", label = "Students", Modifier.weight(1f))
+                            BadgeStat(value = "${currentArtist.worksCount}+", label = "Works", Modifier.weight(1f))
+                            BadgeStat(value = "${currentArtist.studentsCount}+", label = "Students", Modifier.weight(1f))
                         }
 
                         Spacer(modifier = Modifier.height(32.dp))
@@ -186,7 +187,60 @@ fun ArtistDetailScreen(
                             lineHeight = 26.sp
                         )
 
-                        Spacer(modifier = Modifier.height(40.dp))
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        // 🎨 GALLERY SECTION
+                        if (currentArtist.galleryUrls.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 24.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Gallery & Works",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${currentArtist.galleryUrls.size} works",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                currentArtist.galleryUrls.forEach { url ->
+                                    Card(
+                                        modifier = Modifier
+                                            .size(200.dp, 280.dp)
+                                            .clip(RoundedCornerShape(16.dp)),
+                                        elevation = CardDefaults.cardElevation(2.dp)
+                                    ) {
+                                        AsyncImage(
+                                            model = url,
+                                            contentDescription = "Artist Work",
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(40.dp))
+                        }
 
                         // 📲 CONTACT FAB-STYLE BUTTON
                         var isPressed by remember { mutableStateOf(false) }

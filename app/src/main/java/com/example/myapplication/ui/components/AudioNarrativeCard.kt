@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,11 +31,13 @@ fun AudioNarrativeCard(audioUrl: String, title: String) {
     val lifecycleOwner = LocalLifecycleOwner.current
     
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            val mediaItem = MediaItem.fromUri(audioUrl)
-            setMediaItem(mediaItem)
-            prepare()
-        }
+        ExoPlayer.Builder(context).build()
+    }
+
+    LaunchedEffect(audioUrl) {
+        val mediaItem = MediaItem.fromUri(audioUrl)
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
     }
 
     var isPlaying by remember { mutableStateOf(false) }

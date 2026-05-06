@@ -1,16 +1,20 @@
 package com.example.myapplication.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.Artist
 import com.example.myapplication.data.repository.ArtRepository
+import com.example.myapplication.ui.state.UiState
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class ArtistViewModel : ViewModel() {
+class ArtistViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository()
+    private val repository = ArtRepository(application)
 
     private val _selectedArtist = MutableStateFlow<Artist?>(null)
     val selectedArtist: StateFlow<Artist?> = _selectedArtist
@@ -23,6 +27,9 @@ class ArtistViewModel : ViewModel() {
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+
+    private val _mentorshipRequestState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
+    val mentorshipRequestState: StateFlow<UiState<Unit>> = _mentorshipRequestState
 
     fun loadArtist(name: String) {
         viewModelScope.launch {
@@ -69,5 +76,21 @@ class ArtistViewModel : ViewModel() {
             }
             _isLoading.value = false
         }
+    }
+
+    fun requestMentorship(artistId: String, artForm: String) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        viewModelScope.launch {
+            _mentorshipRequestState.value = UiState.Loading
+            repository.requestMentorship(userId, artistId, artForm).onSuccess {
+                _mentorshipRequestState.value = UiState.Success(Unit)
+            }.onFailure {
+                _mentorshipRequestState.value = UiState.Error("Failed to send request. Please try again.")
+            }
+        }
+    }
+
+    fun resetMentorshipRequest() {
+        _mentorshipRequestState.value = UiState.Idle
     }
 }

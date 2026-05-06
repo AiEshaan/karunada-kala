@@ -17,4 +17,7 @@ data class Post(
     val likes: Int = 0,
     @get:PropertyName("liked_by") @set:PropertyName("liked_by") var likedBy: List<String> = emptyList(),
     @PropertyName("media_type") var mediaType: String = "image"
-)
+) {
+    val isLikedByCurrentUser: Boolean
+        get() = likedBy.contains(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid)
+}

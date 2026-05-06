@@ -4,35 +4,37 @@ import android.util.Log
 import com.example.myapplication.data.model.*
 import com.google.firebase.firestore.*
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
+import android.content.Context
+import com.google.gson.reflect.TypeToken
 
 import java.util.UUID
 
-class ArtRepository {
+class ArtRepository(context: Context? = null) {
 
     private val db = FirebaseFirestore.getInstance()
-    private val TAG = "ArtRepository"
+    private val tag = "ArtRepository"
+    private val cache = context?.let { CacheRepository(it) }
 
-    private suspend fun <T> fetchCollection(collectionName: String, clazz: Class<T>): Result<List<T>> {
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun <T : Any> fetchCollection(collectionName: String, clazz: Class<T>): Result<List<T>> {
         return try {
             val snapshot = db.collection(collectionName).get().await()
             val objects = snapshot.toObjects(clazz)
             
-            // Debugging image URLs
-            objects.forEach { obj ->
-                when (obj) {
-                    is ArtForm -> Log.d("IMG_DEBUG", "ArtForm: ${obj.name}, URL: ${obj.imageUrl}")
-                    is Artist -> Log.d("IMG_DEBUG", "Artist: ${obj.name}, URL: ${obj.photoUrl}")
-                    is Event -> Log.d("IMG_DEBUG", "Event: ${obj.title}, URL: ${obj.imageUrl}")
-                    is Workshop -> Log.d("IMG_DEBUG", "Workshop: ${obj.title}, URL: ${obj.imageUrl}")
-                }
-            }
+            // Update cache
+            cache?.saveCollection(collectionName, objects)
             
             Result.success(objects)
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching collection: $collectionName", e)
+            Log.e(tag, "Error fetching collection: $collectionName, trying cache...", e)
+            // Try cache on failure
+            cache?.let {
+                val typeToken = TypeToken.getParameterized(List::class.java, clazz) as TypeToken<List<T>>
+                val cached = it.getCollection(collectionName, typeToken)
+                if (cached.isNotEmpty()) return Result.success(cached)
+            }
             Result.failure(e)
         }
     }
@@ -52,7 +54,7 @@ class ArtRepository {
             val lastDoc = if (snapshot.documents.isNotEmpty()) snapshot.documents.last() else null
             Result.success(Pair(items, lastDoc))
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching paginated art forms", e)
+            Log.e(tag, "Error fetching paginated art forms", e)
             Result.failure(e)
         }
     }
@@ -70,7 +72,7 @@ class ArtRepository {
                     .await()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error incrementing view count for: $artName", e)
+            Log.e(tag, "Error incrementing view count for: $artName", e)
         }
     }
 
@@ -78,17 +80,34 @@ class ArtRepository {
         return fetchCollection("arts", ArtForm::class.java)
     }
 
-    fun <T : Any> observeCollection(collectionName: String, clazz: Class<T>): Flow<List<T>> = callbackFlow {
-        val subscription = db.collection(collectionName)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Any> observeCollection(collectionName: String, clazz: Class<T>): Flow<List<T>> = flow {
+        // Emit cached data first
+        cache?.let {
+            val typeToken = TypeToken.getParameterized(List::class.java, clazz) as TypeToken<List<T>>
+            val cached = it.getCollection(collectionName, typeToken)
+            if (cached.isNotEmpty()) emit(cached)
+        }
+
+        // Then observe Firestore
+        val firestoreFlow = callbackFlow {
+            val subscription = db.collection(collectionName)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.e(tag, "Error observing collection $collectionName", error)
+                        return@addSnapshotListener
+                    }
+                    val objects = snapshot?.toObjects(clazz) ?: emptyList()
+                    trySend(objects)
                 }
-                val objects = snapshot?.toObjects(clazz) ?: emptyList()
-                trySend(objects)
-            }
-        awaitClose { subscription.remove() }
+            awaitClose { subscription.remove() }
+        }
+
+        firestoreFlow.collect { objects ->
+            emit(objects)
+            // Update cache
+            cache?.saveCollection(collectionName, objects)
+        }
     }
 
     fun observeUserRegistrations(userId: String): Flow<List<Registration>> = callbackFlow {
@@ -157,7 +176,7 @@ class ArtRepository {
             }.await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Error enrolling in workshop: ${enrollment.workshopId}", e)
+            Log.e(tag, "Error enrolling in workshop: ${enrollment.workshopId}", e)
             Result.failure(e)
         }
     }
@@ -168,7 +187,7 @@ class ArtRepository {
             val snapshot = enrollmentRef.get().await()
             snapshot.exists()
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking enrollment for workshop: $workshopId", e)
+            Log.e(tag, "Error checking enrollment for workshop: $workshopId", e)
             false
         }
     }
@@ -181,7 +200,7 @@ class ArtRepository {
                 .get().await()
             !snapshot.isEmpty
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking registration for event: $eventTitle", e)
+            Log.e(tag, "Error checking registration for event: $eventTitle", e)
             false
         }
     }
@@ -194,7 +213,7 @@ class ArtRepository {
             db.collection("registrations").document(ticketId).set(finalRegistration).await()
             Result.success(ticketId)
         } catch (e: Exception) {
-            Log.e(TAG, "Error registering for event: ${registration.eventTitle}", e)
+            Log.e(tag, "Error registering for event: ${registration.eventTitle}", e)
             Result.failure(e)
         }
     }
@@ -206,7 +225,7 @@ class ArtRepository {
                 .get().await()
             Result.success(snapshot.toObjects(Registration::class.java))
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching user registrations: $userId", e)
+            Log.e(tag, "Error fetching user registrations: $userId", e)
             Result.failure(e)
         }
     }
@@ -218,7 +237,7 @@ class ArtRepository {
                 .get().await()
             Result.success(snapshot.toObjects(Enrollment::class.java))
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching user enrollments: $userId", e)
+            Log.e(tag, "Error fetching user enrollments: $userId", e)
             Result.failure(e)
         }
     }
@@ -231,7 +250,7 @@ class ArtRepository {
                 .await()
             Result.success(if (doc.exists()) doc.toObject(Artist::class.java) else null)
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching artist by ID: $artistId", e)
+            Log.e(tag, "Error fetching artist by ID: $artistId", e)
             Result.failure(e)
         }
     }
@@ -244,7 +263,27 @@ class ArtRepository {
                 .await()
             Result.success(if (!result.isEmpty) result.documents[0].toObject(Artist::class.java) else null)
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching artist by name: $name", e)
+            Log.e(tag, "Error fetching artist by name: $name", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun requestMentorship(
+        userId: String,
+        artistId: String,
+        artForm: String
+    ): Result<Unit> {
+        return try {
+            val request = hashMapOf(
+                "userId" to userId,
+                "artistId" to artistId,
+                "artForm" to artForm,
+                "status" to "pending",
+                "timestamp" to com.google.firebase.Timestamp.now()
+            )
+            db.collection("mentorship_requests").add(request).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

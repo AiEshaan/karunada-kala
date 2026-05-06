@@ -51,8 +51,9 @@ class PostRepository(private val context: Context) {
         return try {
             val postRef = postsCollection.document(postId)
             db.runTransaction { transaction ->
-                val snapshot = transaction.get(postRef)
-                val likedBy = snapshot.get("likedBy") as? List<String> ?: emptyList()
+                val snapshot = transaction[postRef]
+                @Suppress("UNCHECKED_CAST")
+                val likedBy = (snapshot.get("likedBy") as? List<String>) ?: emptyList()
                 
                 if (likedBy.contains(userId)) {
                     transaction.update(postRef, "likedBy", FieldValue.arrayRemove(userId))

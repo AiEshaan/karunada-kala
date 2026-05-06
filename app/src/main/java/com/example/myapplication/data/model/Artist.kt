@@ -15,5 +15,8 @@ data class Artist(
     @PropertyName("experienceYears") var experienceYears: Int = 10,
     @PropertyName("city") val city: String = "Karnataka",
     @PropertyName("guruName") var guruName: String = "Traditional Master",
-    @PropertyName("studentsDescription") var studentsDescription: String = "Next Generation Apprentices"
+    @PropertyName("studentsDescription") var studentsDescription: String = "Next Generation Apprentices",
+    @PropertyName("worksCount") val worksCount: Int = 0,
+    @PropertyName("studentsCount") val studentsCount: Int = 0,
+    @PropertyName("galleryUrls") val galleryUrls: List<String> = emptyList()
 ) : MapEntity
