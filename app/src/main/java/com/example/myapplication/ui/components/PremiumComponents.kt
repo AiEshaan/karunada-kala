@@ -2,6 +2,8 @@ package com.example.myapplication.ui.components
 
 import android.content.ContentValues
 import android.graphics.Bitmap
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.set
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
@@ -184,10 +186,10 @@ private fun generateQrCode(content: String): Bitmap? {
         val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, 512, 512)
         val width = bitMatrix.width
         val height = bitMatrix.height
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+        val bitmap = createBitmap(width, height, Bitmap.Config.RGB_565)
         for (x in 0 until width) {
             for (y in 0 until height) {
-                bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                bitmap[x, y] = if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE
             }
         }
         bitmap

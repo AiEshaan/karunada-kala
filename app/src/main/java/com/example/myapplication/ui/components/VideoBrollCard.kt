@@ -83,6 +83,7 @@ fun VideoBrollCard(videoUrl: String) {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.4f))
+                        .bounceClick()
                         .clickable { 
                             exoPlayer.play()
                             isPlaying = true

@@ -11,11 +11,17 @@ import com.google.firebase.firestore.DocumentSnapshot
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+import com.example.myapplication.ui.state.UiState
+import com.example.myapplication.core.utils.NetworkUtils
+
 class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = ArtRepository(application)
     private val geminiRepository = GeminiRepository()
     private val searchPrefs = SearchPrefsRepository(application)
+
+    private val _artFormsState = MutableStateFlow<UiState<List<ArtForm>>>(UiState.Loading)
+    val artFormsState: StateFlow<UiState<List<ArtForm>>> = _artFormsState
 
     private val _artForms = MutableStateFlow<List<ArtForm>>(emptyList())
     val artForms: StateFlow<List<ArtForm>> = _artForms
@@ -78,11 +84,20 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isLoading.value = true
             repository.getArtFormsPaginated(pageSize, lastArtDocument).onSuccess { (items, lastDoc) ->
-                if (items.isEmpty()) {
+                if (items.isEmpty() && _artForms.value.isEmpty()) {
+                    _artFormsState.value = UiState.Error("No art forms found")
+                    isLastPage = true
+                } else if (items.isEmpty()) {
                     isLastPage = true
                 } else {
-                    _artForms.update { it + items }
+                    val newList = _artForms.value + items
+                    _artForms.update { newList }
+                    _artFormsState.value = UiState.Success(newList)
                     lastArtDocument = lastDoc
+                }
+            }.onFailure {
+                if (_artForms.value.isEmpty()) {
+                    _artFormsState.value = UiState.Error("Failed to load art forms")
                 }
             }
             _isLoading.value = false
@@ -92,8 +107,9 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchArtForms() {
         viewModelScope.launch {
             _isLoading.value = true
-            repository.getArtForms().onSuccess { forms ->
+            repository.observeCollection("arts", ArtForm::class.java).collect { forms ->
                 _artForms.value = forms
+                _artFormsState.value = UiState.Success(forms)
             }
             _isLoading.value = false
         }
@@ -107,6 +123,8 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _isGeneratingLegend.value = true
+            // Add a small delay for "drama" as requested in Phase 2
+            kotlinx.coroutines.delay(800)
             geminiRepository.generatePersonalizedLegend(artName).onSuccess { legend ->
                 legendCache[artName] = legend
                 _artLegends.update { it + (artName to legend) }

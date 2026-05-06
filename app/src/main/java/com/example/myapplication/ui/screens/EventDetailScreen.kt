@@ -30,6 +30,7 @@ import coil.compose.AsyncImage
 import com.example.myapplication.ui.components.KalaFilterChip
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.viewmodel.EventViewModel
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,7 +119,9 @@ fun EventDetailScreen(
                     model = imageUrl,
                     contentDescription = title,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                    error = painterResource(com.example.myapplication.R.drawable.placeholder)
                 )
                 Box(
                     modifier = Modifier
@@ -216,11 +219,17 @@ fun EventDetailScreen(
                     onClick = { navController.navigate(NavRoutes.map(lat, lng)) }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
+                        // Get API Key from Manifest metadata
+                        val appInfo = context.packageManager.getApplicationInfo(context.packageName, android.content.pm.PackageManager.GET_META_DATA)
+                        val mapsKey = appInfo.metaData.getString("com.google.android.geo.API_KEY") ?: ""
+                        
                         AsyncImage(
-                            model = "https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng&zoom=15&size=600x300&markers=color:red%7C$lat,$lng&key=YOUR_API_KEY", // Note: Would need a real key or use a placeholder
+                            model = "https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng&zoom=15&size=600x300&markers=color:red%7C$lat,$lng&key=$mapsKey",
                             contentDescription = "Map Preview",
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                            error = painterResource(com.example.myapplication.R.drawable.placeholder)
                         )
                         Surface(
                             color = Color.Black.copy(alpha = 0.5f),

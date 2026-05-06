@@ -32,14 +32,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.data.model.Artist
 import com.example.myapplication.ui.components.AudioNarrativeCard
+import com.example.myapplication.ui.components.KalaGlassCard
+import com.example.myapplication.ui.components.KalaElevation
 import com.example.myapplication.ui.components.LegacyTree
 import com.example.myapplication.ui.components.VideoBrollCard
+import com.example.myapplication.ui.components.KalaAnimatedActionButton
 import com.example.myapplication.ui.navigation.NavRoutes
+import com.example.myapplication.ui.components.parallaxScroll
 import com.example.myapplication.viewmodel.ArtistViewModel
 import com.example.myapplication.viewmodel.ArtViewModel
 import kotlinx.coroutines.launch
@@ -86,11 +91,9 @@ fun DetailScreen(
     }
 
     val currentArtForm = artForms.find { it.name == name }
-    val dynamicAudioUrl = currentArtForm?.audioUrl.takeIf { it?.isNotBlank() == true } ?: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
-    val dynamicVideoUrl = currentArtForm?.videoUrl.takeIf { it?.isNotBlank() == true } ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
@@ -105,33 +108,39 @@ fun DetailScreen(
         }
     ) { padding ->
 
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .graphicsLayer {
-                    scaleX = entranceScale
-                    scaleY = entranceScale
-                }
-        ) {
+    val scrollState = rememberScrollState()
 
-            // 🔥 3D HERO EFFECT (WOW Factor)
-            Card(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth()
-                    .height(400.dp)
-                    .graphicsLayer {
-                        rotationY = rotation.value
-                        cameraDistance = 12 * density
-                    }
+    Column(
+        modifier = Modifier
+            .padding(padding)
+            .verticalScroll(scrollState)
+            .graphicsLayer {
+                scaleX = entranceScale
+                scaleY = entranceScale
+            }
+    ) {
+
+        // 🔥 3D HERO EFFECT (WOW Factor)
+        Card(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .height(400.dp)
+                .parallaxScroll(scrollState, 0.4f)
+                .graphicsLayer {
+                    rotationY = rotation.value
+                    cameraDistance = 16 * density
+                }
                     .pointerInput(Unit) {
                         detectTapGestures {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             scope.launch {
                                 rotation.animateTo(
                                     targetValue = if (rotation.value == 0f) 180f else 0f,
-                                    animationSpec = tween(600, easing = FastOutSlowInEasing)
+                                    animationSpec = spring(
+                                        stiffness = Spring.StiffnessLow,
+                                        dampingRatio = Spring.DampingRatioMediumBouncy
+                                    )
                                 )
                             }
                         }
@@ -146,7 +155,9 @@ fun DetailScreen(
                             model = imageUrl,
                             contentDescription = name,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                            error = painterResource(com.example.myapplication.R.drawable.placeholder)
                         )
                         Box(
                             modifier = Modifier
@@ -232,28 +243,44 @@ fun DetailScreen(
 
             // 🎧 AUDIO NARRATIVE (Artisan Voice)
             if (currentArtForm?.audioUrl?.isNotBlank() == true) {
-                AudioNarrativeCard(
-                    audioUrl = currentArtForm.audioUrl,
-                    title = name
-                )
+                KalaGlassCard(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    elevation = KalaElevation.Medium
+                ) {
+                    AudioNarrativeCard(
+                        audioUrl = currentArtForm.audioUrl,
+                        title = name
+                    )
+                }
                 Spacer(modifier = Modifier.height(32.dp))
             }
 
             // 🎥 VIDEO B-ROLL
             if (currentArtForm?.videoUrl?.isNotBlank() == true) {
-                VideoBrollCard(videoUrl = currentArtForm.videoUrl)
+                KalaGlassCard(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    elevation = KalaElevation.Medium
+                ) {
+                    VideoBrollCard(videoUrl = currentArtForm.videoUrl)
+                }
                 Spacer(modifier = Modifier.height(32.dp))
             }
 
             // 👨‍🏫 MENTORSHIP SECTION
-            MentorshipCard(
-                artist = selectedArtist,
-                onManualRequest = {
-                    selectedArtist?.let { artist ->
-                        artistViewModel.requestMentorship(artist.id, name)
+            KalaGlassCard(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                elevation = KalaElevation.Medium,
+                alpha = 0.3f
+            ) {
+                MentorshipCard(
+                    artist = selectedArtist,
+                    onManualRequest = {
+                        selectedArtist?.let { artist ->
+                            artistViewModel.requestMentorship(artist.id, name)
+                        }
                     }
-                }
-            )
+                )
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -272,10 +299,10 @@ fun DetailScreen(
                 Text(
                     "🎭 Related Art Forms",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -296,7 +323,9 @@ fun DetailScreen(
                                     model = art.imageUrl,
                                     contentDescription = art.name,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Crop,
+                                    placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                                    error = painterResource(com.example.myapplication.R.drawable.placeholder)
                                 )
                                 Box(
                                     modifier = Modifier
@@ -357,54 +386,75 @@ fun MentorshipCard(artist: com.example.myapplication.data.model.Artist?, onManua
     val localContext = LocalContext.current
     var isRequested by remember { mutableStateOf(false) }
 
-    Surface(
-        modifier = Modifier
-            .padding(horizontal = 16.dp)
-            .fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(24.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-    ) {
-        Column(modifier = Modifier.padding(24.dp)) {
+    Column(modifier = Modifier.padding(24.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "GURU-SHISHYA MENTORSHIP",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
+                letterSpacing = 1.sp,
+                modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Learn from the Master",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Connect with ${artist?.name ?: "this master"} for professional training and guidance in ${artist?.artType ?: "this art form"}.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(24.dp))
-            
-            Button(
-                onClick = {
-                    if (!isRequested) {
-                        isRequested = true
-                        onManualRequest()
-                        android.widget.Toast.makeText(localContext, "Mentorship request sent to the Guru! 🙏", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = if (isRequested) ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)) else ButtonDefaults.buttonColors()
+            Surface(
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (isRequested) "Request Sent ✓" else "Request Mentorship",
-                    fontWeight = FontWeight.Bold
+                    "🔥 LIMITED SLOTS",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    fontWeight = FontWeight.Black
                 )
             }
         }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "Learn from the Master",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold
+        )
+        Spacer(Modifier.height(8.dp))
+        
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            SuggestionChip(
+                onClick = {},
+                label = { Text("⭐ ${artist?.experienceYears ?: "12"}+ Years") },
+                colors = SuggestionChipDefaults.suggestionChipColors(labelColor = MaterialTheme.colorScheme.primary)
+            )
+            SuggestionChip(
+                onClick = {},
+                label = { Text("📍 ${artist?.city ?: "Karnataka"}") },
+                colors = SuggestionChipDefaults.suggestionChipColors(labelColor = MaterialTheme.colorScheme.primary)
+            )
+        }
+        
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            text = "Connect with ${artist?.name ?: "this master"} for professional training and guidance in ${artist?.artType ?: "this art form"}.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(24.dp))
+        
+        KalaAnimatedActionButton(
+            text = "Request Mentorship",
+            successText = "Request Sent",
+            isLoading = false, // We don't have a loading state in this simple implementation
+            isSuccess = isRequested,
+            onClick = {
+                if (!isRequested) {
+                    isRequested = true
+                    onManualRequest()
+                    android.widget.Toast.makeText(localContext, "Mentorship request sent to the Guru! 🙏", android.widget.Toast.LENGTH_LONG).show()
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = MaterialTheme.colorScheme.primary,
+            successColor = Color(0xFF2E7D32)
+        )
     }
 }
 
@@ -432,7 +482,9 @@ fun CustodianSection(artist: Artist, onClick: () -> Unit) {
                     .background(Color(0xFFD4AF37), CircleShape)
                     .padding(2.dp)
                     .clip(CircleShape),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                error = painterResource(com.example.myapplication.R.drawable.placeholder)
             )
             
             Spacer(Modifier.width(16.dp))

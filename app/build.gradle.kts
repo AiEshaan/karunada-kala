@@ -24,14 +24,15 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val localProperties = project.rootProject.file("local.properties")
-        val apiKey = if (localProperties.exists()) {
-            val properties = Properties()
+        val properties = Properties()
+        if (localProperties.exists()) {
             properties.load(localProperties.inputStream())
-            properties.getProperty("GEMINI_API_KEY") ?: ""
-        } else {
-            ""
         }
-        buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
+        val geminiApiKey = properties.getProperty("GEMINI_API_KEY") ?: ""
+        val mapsApiKey = properties.getProperty("MAPS_API_KEY") ?: "AIzaSyAp5FIo6CR5xgyVwr7BHi0G4A88EEO8y4M" // Fallback to current if missing
+        
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

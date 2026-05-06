@@ -40,6 +40,8 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             
+            // Add a temporary "Kala is thinking" message if you want, or just rely on isLoading
+            
             // Request response from Gemini
             repository.askKala(userText, _currentContext.value, chatHistory).onSuccess { reply ->
                 // Update message state with response

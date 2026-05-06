@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.Artist
-import com.example.myapplication.data.repository.ArtRepository
+import com.example.myapplication.data.repository.ArtistRepository
 import com.example.myapplication.ui.state.UiState
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 class ArtistViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository(application)
+    private val repository = ArtistRepository(application)
 
     private val _selectedArtist = MutableStateFlow<Artist?>(null)
     val selectedArtist: StateFlow<Artist?> = _selectedArtist

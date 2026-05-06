@@ -7,13 +7,15 @@ import com.example.myapplication.data.model.Workshop
 import com.example.myapplication.data.model.Enrollment
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.data.repository.ArtRepository
+import com.example.myapplication.data.repository.WorkshopRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class WorkshopViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository(application)
+    private val repository = WorkshopRepository(application)
+    private val artRepository = ArtRepository(application)
 
     private val _workshops = MutableStateFlow<List<Workshop>>(emptyList())
     val workshops: StateFlow<List<Workshop>> = _workshops
@@ -40,7 +42,7 @@ class WorkshopViewModel(application: Application) : AndroidViewModel(application
         get() = FirebaseAuth.getInstance().currentUser?.uid ?: "guest_user"
 
     fun fetchWorkshops() {
-        repository.observeCollection("workshops", Workshop::class.java)
+        artRepository.observeCollection("workshops", Workshop::class.java)
             .onStart { _uiState.value = UiState.Loading }
             .onEach { list ->
                 _workshops.value = list

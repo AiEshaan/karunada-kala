@@ -79,6 +79,7 @@ fun AudioNarrativeCard(audioUrl: String, title: String) {
                 modifier = Modifier
                     .size(56.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .bounceClick()
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,

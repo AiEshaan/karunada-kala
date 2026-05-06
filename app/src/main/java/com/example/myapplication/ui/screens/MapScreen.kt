@@ -3,7 +3,7 @@ package com.example.myapplication.ui.screens
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
+import androidx.core.net.toUri
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -41,6 +41,8 @@ import com.example.myapplication.data.model.Artist
 import com.example.myapplication.data.model.Event
 import com.example.myapplication.data.model.Workshop
 import com.example.myapplication.ui.components.KalaActionButton
+import com.example.myapplication.ui.components.KalaGlassCard
+import com.example.myapplication.ui.components.KalaElevation
 import com.example.myapplication.ui.components.KalaFilterChip
 import com.example.myapplication.ui.model.MapItem
 import com.example.myapplication.ui.navigation.NavRoutes
@@ -56,7 +58,10 @@ import com.google.maps.android.compose.*
 import com.example.myapplication.R
 import com.google.maps.android.compose.clustering.Clustering
 
-@OptIn(MapsComposeExperimentalApi::class)
+import com.example.myapplication.ui.state.UiState
+import com.example.myapplication.ui.components.UiStateHandler
+
+@OptIn(MapsComposeExperimentalApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     navController: NavController,
@@ -70,6 +75,7 @@ fun MapScreen(
     val haptic = LocalHapticFeedback.current
     
     val mapItems by mapViewModel.mapItems.collectAsState()
+    val uiState by mapViewModel.uiState.collectAsState()
     val stableItems = remember(mapItems.hashCode()) { mapItems.take(50) }
     val filterType by mapViewModel.selectedFilter.collectAsState()
     val showOnlyToday by mapViewModel.showOnlyToday.collectAsState()
@@ -104,21 +110,25 @@ fun MapScreen(
 
     // Handle deep link or initial position
     LaunchedEffect(initialLat, initialLng, mapItems) {
-        if ((initialLat != null) && (initialLng != null)) {
-            val target = LatLng(initialLat, initialLng)
-            cameraPositionState.animate(
-                update = CameraUpdateFactory.newLatLngZoom(target, 14f),
-                durationMs = 1000
-            )
-            // Auto-select the deep-linked item if it exists in the list
-            mapItems.find { it.lat == initialLat && it.lng == initialLng }?.let { item ->
-                selectedItem = item
+        try {
+            if ((initialLat != null) && (initialLng != null)) {
+                val target = LatLng(initialLat, initialLng)
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(target, 14f),
+                    durationMs = 1000
+                )
+                // Auto-select the deep-linked item if it exists in the list
+                mapItems.find { it.lat == initialLat && it.lng == initialLng }?.let { item ->
+                    selectedItem = item
+                }
+            } else if (mapItems.isEmpty()) {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(karnatakaCenter, 7f),
+                    durationMs = 1500
+                )
             }
-        } else if (mapItems.isEmpty()) {
-            cameraPositionState.animate(
-                update = CameraUpdateFactory.newLatLngZoom(karnatakaCenter, 7f),
-                durationMs = 1500
-            )
+        } catch (e: Exception) {
+            android.util.Log.e("MapScreen", "Camera animation error", e)
         }
     }
     
@@ -136,106 +146,113 @@ fun MapScreen(
     }
     
     Box(modifier = Modifier.fillMaxSize()) {
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState,
-            properties = mapProperties,
-            onMapLoaded = { isMapInitialized = true },
-            onMapClick = { selectedItem = null },
-            uiSettings = MapUiSettings(zoomControlsEnabled = false)
+        UiStateHandler(
+            uiState = uiState,
+            onRetry = { mapViewModel.fetchData() }
         ) {
-            if (isMapInitialized && stableItems.isNotEmpty()) {
-                key(stableItems.size) {
-                    Clustering(
-                        items = stableItems,
-                        onClusterItemClick = { item ->
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            selectedItem = item
-                            true
-                        },
-                        // clusterItemContent renders visual content that gets converted to a marker bitmap.
-                        // Do NOT put Marker() composables here — that causes "Invalid applier" crash.
-                        clusterItemContent = { item ->
-                            val isDeepLinked = item.lat == initialLat && item.lng == initialLng
-                            val markerColor = when (item.type) {
-                                "Artists" -> Color(0xFFD4AF37)   // Gold
-                                "Events" -> Color(0xFFBF4F26)    // Terracotta
-                                "Workshops" -> Color(0xFF008080) // Teal
-                                else -> MaterialTheme.colorScheme.primary
-                            }
-                            val emoji = when (item.type) {
-                                "Artists" -> "🎭"
-                                "Events" -> "🎪"
-                                "Workshops" -> "🧑‍🏫"
-                                else -> "📍"
-                            }
-                            
-                            val isLive = (item.data as? Event)?.date?.contains("2024", ignoreCase = true) == true // Simple check for "Now"
-
-                            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                            val pulseScale by infiniteTransition.animateFloat(
-                                initialValue = 1f,
-                                targetValue = if (isLive) 1.2f else 1f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(1000, easing = FastOutSlowInEasing),
-                                    repeatMode = RepeatMode.Reverse
-                                ),
-                                label = "pulseScale"
-                            )
-
-                            // Standard Compose UI for the marker icon
-                            Surface(
-                                modifier = Modifier.size(if (isDeepLinked) 44.dp else 36.dp).graphicsLayer {
-                                    scaleX = if (isLive) pulseScale else 1f
-                                    scaleY = if (isLive) pulseScale else 1f
+            key(Unit) {
+                GoogleMap(
+                    modifier = Modifier.fillMaxSize(),
+                    cameraPositionState = cameraPositionState,
+                    properties = mapProperties,
+                    onMapLoaded = { isMapInitialized = true },
+                    onMapClick = { selectedItem = null },
+                    uiSettings = MapUiSettings(zoomControlsEnabled = false)
+                ) {
+                    if (isMapInitialized && stableItems.isNotEmpty()) {
+                        key(stableItems.size) {
+                            Clustering(
+                                items = stableItems,
+                                onClusterItemClick = { item ->
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    selectedItem = item
+                                    true
                                 },
-                                shape = CircleShape,
-                                color = markerColor,
-                                tonalElevation = if (isDeepLinked) 12.dp else 4.dp,
-                                border = BorderStroke(
-                                    if (isDeepLinked) 3.dp else 2.dp,
-                                    Color.White
-                                )
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(emoji, fontSize = if (isDeepLinked) 18.sp else 14.sp)
-                                }
-                            }
-                        },
-                        clusterContent = { cluster ->
-                            val clusterSize = cluster.items.size
-                            val items = cluster.items
+                                // clusterItemContent renders visual content that gets converted to a marker bitmap.
+                                // Do NOT put Marker() composables here — that causes "Invalid applier" crash.
+                                clusterItemContent = { item ->
+                                    val isDeepLinked = item.lat == initialLat && item.lng == initialLng
+                                    val markerColor = when (item.type) {
+                                        "Artists" -> Color(0xFFD4AF37)   // Gold
+                                        "Events" -> Color(0xFFBF4F26)    // Terracotta
+                                        "Workshops" -> Color(0xFF008080) // Teal
+                                        else -> MaterialTheme.colorScheme.primary
+                                    }
+                                    val emoji = when (item.type) {
+                                        "Artists" -> "🎭"
+                                        "Events" -> "🎪"
+                                        "Workshops" -> "🧑‍🏫"
+                                        else -> "📍"
+                                    }
 
-                            Surface(
-                                modifier = Modifier.size(56.dp),
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary,
-                                tonalElevation = 8.dp,
-                                border = BorderStroke(2.dp, Color.White)
-                            ) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.Center,
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = clusterSize.toString(),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Black,
-                                        color = Color.White
+                                    val isLive = (item.data as? Event)?.date?.contains("2024", ignoreCase = true) == true || showOnlyToday
+
+                                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                                    val pulseScale by infiniteTransition.animateFloat(
+                                        initialValue = 1f,
+                                        targetValue = if (isLive) 1.3f else 1f,
+                                        animationSpec = infiniteRepeatable(
+                                            animation = tween(1000, easing = LinearOutSlowInEasing),
+                                            repeatMode = RepeatMode.Reverse
+                                        ),
+                                        label = "pulseScale"
                                     )
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (items.any { it.type == "Artists" }) Text("🎭", fontSize = 8.sp)
-                                        if (items.any { it.type == "Events" }) Text("🎪", fontSize = 8.sp)
-                                        if (items.any { it.type == "Workshops" }) Text("🧑‍🏫", fontSize = 8.sp)
+                                    
+                                    // Standard Compose UI for the marker icon
+                                    Surface(
+                                        modifier = Modifier.size(if (isDeepLinked) 44.dp else 36.dp).graphicsLayer {
+                                            scaleX = pulseScale
+                                            scaleY = pulseScale
+                                        },
+                                        shape = CircleShape,
+                                        color = markerColor,
+                                        tonalElevation = if (isDeepLinked || isLive) 12.dp else 4.dp,
+                                        border = BorderStroke(
+                                            if (isDeepLinked || isLive) 3.dp else 2.dp,
+                                            if (isLive) Color.Yellow else Color.White
+                                        )
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(emoji, fontSize = if (isDeepLinked) 18.sp else 14.sp)
+                                        }
+                                    }
+                                },
+                                clusterContent = { cluster ->
+                                    val clusterSize = cluster.items.size
+                                    val items = cluster.items
+
+                                    Surface(
+                                        modifier = Modifier.size(56.dp),
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        tonalElevation = 8.dp,
+                                        border = BorderStroke(2.dp, Color.White)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.fillMaxSize(),
+                                            verticalArrangement = Arrangement.Center,
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = clusterSize.toString(),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color.White
+                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                if (items.any { it.type == "Artists" }) Text("🎭", fontSize = 8.sp)
+                                                if (items.any { it.type == "Events" }) Text("🎪", fontSize = 8.sp)
+                                                if (items.any { it.type == "Workshops" }) Text("🧑‍🏫", fontSize = 8.sp)
+                                            }
+                                        }
                                     }
                                 }
-                            }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }
@@ -322,19 +339,28 @@ fun MapScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             selectedItem?.let { item ->
-                Card(
+                val userLoc = mapViewModel.userLocation.collectAsState().value
+                val distanceText = remember(item, userLoc) {
+                    userLoc?.let {
+                        val results = FloatArray(1)
+                        android.location.Location.distanceBetween(it.latitude, it.longitude, item.lat, item.lng, results)
+                        val dist = results[0]
+                        if (dist < 1000) "${dist.toInt()}m away" else "${String.format("%.1f", dist / 1000f)}km away"
+                    }
+                }
+                
+                KalaGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = CardDefaults.cardElevation(12.dp)
+                    elevation = KalaElevation.High
                 ) {
                     Column {
                         val itemData = item.data
                         when (itemData) {
-                            is Artist -> ArtistMapUI(itemData, navController) { selectedItem = null }
-                            is Event -> EventMapUI(itemData, eventViewModel, navController) { selectedItem = null }
-                            is Workshop -> WorkshopMapUI(itemData, workshopViewModel, navController) { selectedItem = null }
+                            is Artist -> ArtistMapUI(itemData, distanceText, navController) { selectedItem = null }
+                            is Event -> EventMapUI(itemData, distanceText, eventViewModel, navController) { selectedItem = null }
+                            is Workshop -> WorkshopMapUI(itemData, distanceText, workshopViewModel, navController) { selectedItem = null }
                             else -> {}
                         }
                         
@@ -372,7 +398,7 @@ fun MapScreen(
                         KalaActionButton(
                             text = "Navigate to Location",
                             onClick = {
-                                val uri = Uri.parse("google.navigation:q=${item.lat},${item.lng}")
+                                val uri = "google.navigation:q=${item.lat},${item.lng}".toUri()
                                 val intent = Intent(Intent.ACTION_VIEW, uri)
                                 intent.setPackage("com.google.android.apps.maps")
                                 try {
@@ -392,7 +418,7 @@ fun MapScreen(
 }
 
 @Composable
-fun ArtistMapUI(artist: Artist, navController: NavController, onClose: () -> Unit) {
+fun ArtistMapUI(artist: Artist, distance: String? = null, navController: NavController, onClose: () -> Unit) {
     val context = LocalContext.current
     Column(modifier = Modifier.padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -408,7 +434,13 @@ fun ArtistMapUI(artist: Artist, navController: NavController, onClose: () -> Uni
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(artist.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                Text(artist.artType, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(artist.artType, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                    if (distance != null) {
+                        Text(" • ", color = Color.Gray)
+                        Text(distance, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                }
             }
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null) }
         }
@@ -422,7 +454,7 @@ fun ArtistMapUI(artist: Artist, navController: NavController, onClose: () -> Uni
             OutlinedButton(
                 onClick = {
                     val url = "https://api.whatsapp.com/send?phone=${artist.phone}"
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                     context.startActivity(intent)
                 },
                 modifier = Modifier.weight(1f),
@@ -438,7 +470,8 @@ fun ArtistMapUI(artist: Artist, navController: NavController, onClose: () -> Uni
 }
 
 @Composable
-fun EventMapUI(event: Event, viewModel: EventViewModel, navController: NavController, onClose: () -> Unit) {
+fun EventMapUI(event: Event, distance: String? = null, viewModel: EventViewModel, navController: NavController, onClose: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
     val registrationStatus by viewModel.registrationStatus.collectAsState()
     val isRegistered = registrationStatus[event.title] ?: false
     Column(modifier = Modifier.padding(20.dp)) {
@@ -447,7 +480,13 @@ fun EventMapUI(event: Event, viewModel: EventViewModel, navController: NavContro
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(event.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(event.date, color = Color(0xFFD4AF37), fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(event.date, color = Color(0xFFD4AF37), fontWeight = FontWeight.Bold)
+                    if (distance != null) {
+                        Text(" • ", color = Color.Gray)
+                        Text(distance, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                }
             }
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null) }
         }
@@ -471,7 +510,10 @@ fun EventMapUI(event: Event, viewModel: EventViewModel, navController: NavContro
             ) { Text("Full Story") }
             KalaActionButton(
                 text = if (isRegistered) "Saved ✓" else "Join",
-                onClick = { viewModel.register(event) },
+                onClick = { 
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.register(event) 
+                },
                 modifier = Modifier.weight(1f),
                 enabled = !isRegistered,
                 containerColor = if (isRegistered) Color(0xFF2E7D32) else Color(0xFFD4AF37)
@@ -481,7 +523,8 @@ fun EventMapUI(event: Event, viewModel: EventViewModel, navController: NavContro
 }
 
 @Composable
-fun WorkshopMapUI(workshop: Workshop, viewModel: WorkshopViewModel, navController: NavController, onClose: () -> Unit) {
+fun WorkshopMapUI(workshop: Workshop, distance: String? = null, viewModel: WorkshopViewModel, navController: NavController, onClose: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
     val enrollmentStatus by viewModel.enrollmentStatus.collectAsState()
     val isEnrolled = enrollmentStatus[workshop.id] ?: false
     Column(modifier = Modifier.padding(20.dp)) {
@@ -490,7 +533,13 @@ fun WorkshopMapUI(workshop: Workshop, viewModel: WorkshopViewModel, navControlle
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(workshop.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text("${workshop.availableSlots} slots left", color = Color(0xFF008080), fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${workshop.availableSlots} slots left", color = Color(0xFF008080), fontWeight = FontWeight.Bold)
+                    if (distance != null) {
+                        Text(" • ", color = Color.Gray)
+                        Text(distance, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                }
             }
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null) }
         }
@@ -512,7 +561,10 @@ fun WorkshopMapUI(workshop: Workshop, viewModel: WorkshopViewModel, navControlle
             ) { Text("Details") }
             KalaActionButton(
                 text = if (isEnrolled) "Saved ✓" else "Enroll",
-                onClick = { viewModel.enroll(workshop) },
+                onClick = { 
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.enroll(workshop) 
+                },
                 modifier = Modifier.weight(1f),
                 enabled = !isEnrolled && workshop.availableSlots > 0,
                 containerColor = if (isEnrolled) Color(0xFF2E7D32) else Color(0xFF008080)

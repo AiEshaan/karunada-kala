@@ -16,6 +16,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import com.example.myapplication.data.model.ArtForm
 
@@ -41,6 +42,7 @@ fun ArtOfTheDayCard(
             .height(240.dp)
             .padding(16.dp)
             .clip(RoundedCornerShape(24.dp))
+            .bounceClick()
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(8.dp)
     ) {
@@ -49,7 +51,9 @@ fun ArtOfTheDayCard(
                 model = art.imageUrl,
                 contentDescription = art.name,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                error = painterResource(com.example.myapplication.R.drawable.placeholder)
             )
             
             // Gradient Overlay

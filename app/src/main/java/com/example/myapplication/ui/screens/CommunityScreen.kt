@@ -30,6 +30,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -38,13 +43,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LocalLifecycleOwner as LifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.myapplication.data.model.Post
+import com.example.myapplication.ui.components.KalaGlassCard
+import com.example.myapplication.ui.components.KalaElevation
 import com.example.myapplication.ui.components.UiStateHandler
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.viewmodel.PostViewModel
 import kotlinx.coroutines.launch
+
+import com.example.myapplication.core.utils.TimeUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +82,7 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
@@ -174,12 +184,15 @@ fun SortTab(label: String, active: Boolean, onClick: () -> Unit) {
 fun CulturalPostCard(post: Post, viewModel: PostViewModel) {
     var showComments by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
-    Card(
+    val heartScale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+
+    KalaGlassCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = KalaElevation.Low,
+        alpha = 0.85f
     ) {
         Column {
             // Header
@@ -199,10 +212,16 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel) {
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(post.userName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    if (post.location?.isNotBlank() == true) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(12.dp), tint = Color.Gray)
-                            Spacer(Modifier.width(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = TimeUtils.relativeTime(post.timestamp?.toDate()),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray
+                        )
+                        if (post.location?.isNotBlank() == true) {
+                            Text(" • ", color = Color.Gray)
+                            Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(10.dp), tint = Color.Gray)
+                            Spacer(Modifier.width(2.dp))
                             Text(post.location, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                         }
                     }
@@ -230,7 +249,9 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel) {
                     model = post.imageUrl,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                    error = painterResource(com.example.myapplication.R.drawable.placeholder)
                 )
             }
 
@@ -239,13 +260,12 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel) {
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { viewModel.toggleLike(post.id) }) {
-                    Icon(
-                        if (post.isLikedByCurrentUser) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Like",
-                        tint = if (post.isLikedByCurrentUser) Color.Red else MaterialTheme.colorScheme.primary
-                    )
-                }
+                com.example.myapplication.ui.components.LikeButton(
+                    isLiked = post.isLikedByCurrentUser,
+                    onClick = {
+                        viewModel.toggleLike(post.id)
+                    }
+                )
                 Text("${post.likes}", style = MaterialTheme.typography.labelLarge)
                 
                 IconButton(onClick = { showComments = true }) {
@@ -264,7 +284,10 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel) {
                 Text(
                     text = post.caption,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).padding(bottom = 16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif
+                    ),
                     lineHeight = 20.sp
                 )
             }

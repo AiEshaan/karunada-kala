@@ -9,7 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.core.net.toUri
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.myapplication.viewmodel.ArtistViewModel
@@ -117,7 +118,9 @@ fun ArtistDetailScreen(
                                     .build(),
                                 contentDescription = currentArtist.name,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                                error = painterResource(com.example.myapplication.R.drawable.placeholder)
                             )
 
                             Box(
@@ -234,7 +237,9 @@ fun ArtistDetailScreen(
                                             model = url,
                                             contentDescription = "Artist Work",
                                             modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
+                                            contentScale = ContentScale.Crop,
+                                            placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                                            error = painterResource(com.example.myapplication.R.drawable.placeholder)
                                         )
                                     }
                                 }
@@ -250,7 +255,7 @@ fun ArtistDetailScreen(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 val url = "https://wa.me/${currentArtist.phone}"
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                                 context.startActivity(intent)
                             },
                             modifier = Modifier

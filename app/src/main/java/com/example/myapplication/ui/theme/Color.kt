@@ -29,3 +29,8 @@ val ArtTerraDark = Color(0xFFE8A878) // Warm Clay
 val ArtClayDark = Color(0xFFD4C5A9)  // Aged Wood
 val ArtBGDark = Color(0xFF1A1612)    // Aged Walnut
 val ArtSurfaceDark = Color(0xFF2A241E) // Dark Leather
+
+// Phase 1: Global Background Foundation
+val WarmCream = Color(0xFFF5F1E8)
+val SoftGreen = Color(0xFFE6F2EC)
+val SoftWhiteGlow = Color(0xFFFFFFFF)

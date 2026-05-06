@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.model.Post
 import com.example.myapplication.data.model.Registration
 import com.example.myapplication.data.model.Enrollment
-import com.example.myapplication.data.repository.ArtRepository
+import com.example.myapplication.data.repository.*
 import com.example.myapplication.data.repository.PostRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.example.myapplication.data.model.Badge
@@ -15,7 +15,9 @@ import kotlinx.coroutines.launch
 
 class JourneyViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository(application)
+    private val artRepository = ArtRepository(application)
+    private val eventRepository = EventRepository(application)
+    private val workshopRepository = WorkshopRepository(application)
     private val postRepository = PostRepository(application)
     private val auth = FirebaseAuth.getInstance()
     
@@ -99,12 +101,12 @@ class JourneyViewModel(application: Application) : AndroidViewModel(application)
         _userAvatar.value = user?.photoUrl?.toString() ?: ""
 
         // Observe Registrations
-        repository.observeUserRegistrations(userId)
+        eventRepository.observeUserRegistrations(userId)
             .onEach { _registrations.value = it }
             .launchIn(viewModelScope)
 
         // Observe Enrollments
-        repository.observeUserEnrollments(userId)
+        workshopRepository.observeUserEnrollments(userId)
             .onEach { _enrollments.value = it }
             .launchIn(viewModelScope)
         
@@ -127,7 +129,7 @@ class JourneyViewModel(application: Application) : AndroidViewModel(application)
                 timestamp = com.google.firebase.Timestamp.now(),
                 type = "AI_Suggestion"
             )
-            repository.registerForEvent(entry).onSuccess {
+            eventRepository.registerForEvent(entry).onSuccess {
                 fetchJourney()
             }
         }
@@ -144,6 +146,8 @@ class JourneyViewModel(application: Application) : AndroidViewModel(application)
 
         user.updateProfile(profileUpdates).addOnCompleteListener { task ->
             if (task.isSuccessful) {
+                _userName.value = name
+                _userAvatar.value = photoUrl
                 fetchJourney()
             }
         }

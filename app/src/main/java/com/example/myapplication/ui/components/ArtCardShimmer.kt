@@ -12,15 +12,11 @@ import com.valentinilk.shimmer.shimmer
 
 @Composable
 fun ArtCardShimmer() {
-    val shimmerInstance = rememberShimmer(shimmerBounds = ShimmerBounds.View)
-    Card(
+    KalaShimmer(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .fillMaxWidth()
-            .height(220.dp)
-            .shimmer(shimmerInstance),
+            .height(220.dp),
         shape = RoundedCornerShape(20.dp)
-    ) {
-        Box(Modifier.fillMaxSize())
-    }
+    )
 }

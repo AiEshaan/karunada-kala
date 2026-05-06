@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.HelpCenter
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
@@ -23,6 +22,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import java.util.Locale
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -33,9 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import com.example.myapplication.data.model.Post
 import com.example.myapplication.ui.components.EventCardShimmer
+import com.example.myapplication.ui.components.KalaGlassCard
+import com.example.myapplication.ui.components.KalaElevation
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.viewmodel.AuthViewModel
 import com.example.myapplication.viewmodel.JourneyViewModel
@@ -63,7 +68,7 @@ fun MyJourneyScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { 
@@ -81,7 +86,9 @@ fun MyJourneyScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                    actionIconContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         }
@@ -212,32 +219,37 @@ fun MyJourneyScreen(
 
 @Composable
 fun AchievementSection(badges: List<com.example.myapplication.data.model.Badge>) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        SectionHeader("🏆 Achievements", Modifier.padding(bottom = 12.dp))
-        
-        val unlockedCount = badges.count { it.isUnlocked }
-        val progress = if (badges.isNotEmpty()) unlockedCount.toFloat() / badges.size else 0f
-        
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Cultural Progress", style = MaterialTheme.typography.labelMedium)
-                Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+    KalaGlassCard(
+        modifier = Modifier.padding(16.dp),
+        elevation = KalaElevation.Low
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            SectionHeader("🏆 Achievements", Modifier.padding(bottom = 12.dp))
+            
+            val unlockedCount = badges.count { it.isUnlocked }
+            val progress = if (badges.isNotEmpty()) unlockedCount.toFloat() / badges.size else 0f
+            
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Cultural Progress", style = MaterialTheme.typography.labelMedium)
+                    Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                )
             }
-            Spacer(Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-            )
-        }
 
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            badges.forEach { badge ->
-                BadgeItem(badge)
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                badges.forEach { badge ->
+                    BadgeItem(badge)
+                }
             }
         }
     }
@@ -245,14 +257,10 @@ fun AchievementSection(badges: List<com.example.myapplication.data.model.Badge>)
 
 @Composable
 fun BadgeItem(badge: com.example.myapplication.data.model.Badge) {
-    Card(
+    KalaGlassCard(
         modifier = Modifier.width(140.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (badge.isUnlocked) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) 
-                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        ),
-        border = if (badge.isUnlocked) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) else null
+        elevation = KalaElevation.Low,
+        alpha = if (badge.isUnlocked) 0.65f else 0.3f
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -311,11 +319,19 @@ fun SettingsSheet(
     navController: NavController,
     authViewModel: AuthViewModel = viewModel()
 ) {
+    var demoMode by remember { mutableStateOf(false) }
+    
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(24.dp).padding(bottom = 32.dp)) {
+        Column(modifier = Modifier.padding(24.dp).padding(bottom = 32.dp).verticalScroll(rememberScrollState())) {
             Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(24.dp))
             
+            Text("ACCOUNT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            SettingItem(Icons.Default.Person, "Profile Details", "Eshaan P.M")
+            SettingItem(Icons.Default.Email, "Email", "eshaan@heritage.in")
+            
+            Spacer(Modifier.height(16.dp))
+            Text("PREFERENCES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             SettingItem(Icons.Default.Notifications, "Notifications", "Enabled")
             SettingItem(Icons.Default.Translate, "Language", "English (Kannada Ready)")
             
@@ -323,13 +339,18 @@ fun SettingsSheet(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.DarkMode, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.Build, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(16.dp))
-                Text("Dark Mode", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Switch(checked = isSystemInDarkTheme(), onCheckedChange = { /* Toggle Logic */ })
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Demo Mode", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text("Preload presentation data", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+                Switch(checked = demoMode, onCheckedChange = { demoMode = it })
             }
 
-            SettingItem(Icons.Default.Info, "App Version", "1.0.0 (WOW)")
+            Spacer(Modifier.height(16.dp))
+            Text("APP INFO", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            SettingItem(Icons.Default.Info, "App Version", "1.1.0 (WOW Polish)")
             SettingItem(Icons.AutoMirrored.Filled.HelpCenter, "Cultural Help Center", null)
             
             Spacer(Modifier.height(32.dp))
@@ -396,7 +417,9 @@ fun ProfileHeader(name: String, avatarUrl: String, level: String, onEditClick: (
                     .size(100.dp)
                     .clip(CircleShape)
                     .background(Color.LightGray),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                error = painterResource(com.example.myapplication.R.drawable.placeholder)
             )
             Surface(
                 modifier = Modifier.size(32.dp),
@@ -500,7 +523,9 @@ fun MyPostCard(post: Post) {
                 model = post.imageUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                error = painterResource(com.example.myapplication.R.drawable.placeholder)
             )
             Box(
                 modifier = Modifier
@@ -527,33 +552,43 @@ fun StaggeredJourneyItem(index: Int, content: @Composable () -> Unit) {
         animatable.animateTo(0f, spring(stiffness = 300f, dampingRatio = 0.8f))
         alpha.animateTo(1f, tween(500))
     }
-    Box(modifier = Modifier.offset(y = animatable.value.dp).graphicsLayer { this.alpha = alpha.value }) { content() }
+    Box(modifier = Modifier.offset { IntOffset(0, animatable.value.dp.roundToPx()) }.graphicsLayer { this.alpha = alpha.value }) { content() }
 }
 
 @Composable
 fun StatsCard(registrations: Int, enrollments: Int, chronicles: Int) {
-    Card(
+    KalaGlassCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
+        elevation = KalaElevation.Medium,
+        alpha = 0.9f
     ) {
         Row(
-            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            modifier = Modifier
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF0F3D2E), Color(0xFF1F6F5B))
+                    )
+                )
+                .padding(24.dp)
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            StatItem(count = registrations, label = "Events", icon = "🏛")
-            StatItem(count = enrollments, label = "Workshops", icon = "🏺")
-            StatItem(count = chronicles, label = "Stories", icon = "📜")
+            StatItem(count = registrations, label = "Events", icon = "🏛", isDark = true)
+            StatItem(count = enrollments, label = "Workshops", icon = "🏺", isDark = true)
+            StatItem(count = chronicles, label = "Stories", icon = "📜", isDark = true)
         }
     }
 }
 
 @Composable
-fun StatItem(count: Int, label: String, icon: String) {
+fun StatItem(count: Int, label: String, icon: String, isDark: Boolean = false) {
+    val textColor = if (isDark) Color.White else MaterialTheme.colorScheme.primary
+    val subTextColor = if (isDark) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(icon, fontSize = 24.sp)
-        Text(count.toString(), style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.ExtraBold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+        Text(count.toString(), style = MaterialTheme.typography.headlineSmall, color = textColor, fontWeight = FontWeight.ExtraBold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = subTextColor)
     }
 }
 
@@ -609,18 +644,17 @@ fun JourneyItemCard(
     status: String,
     accentColor: Color
 ) {
-    Card(
+    val locale = LocalConfiguration.current.locales[0]
+    KalaGlassCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.2f))
+        elevation = KalaElevation.Low
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 if (timestamp != null) {
-                    val date = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(timestamp.toDate())
+                    val date = java.text.SimpleDateFormat("dd MMM yyyy", locale).format(timestamp.toDate())
                     Text(date, style = MaterialTheme.typography.labelSmall, color = Color.Gray.copy(alpha = 0.6f))
                 }
             }

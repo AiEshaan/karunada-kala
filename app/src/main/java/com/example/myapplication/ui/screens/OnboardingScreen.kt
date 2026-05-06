@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -80,7 +81,9 @@ fun OnboardingScreen(
                             scaleX = 1f + (pageOffset.absoluteValue * 0.1f)
                             scaleY = 1f + (pageOffset.absoluteValue * 0.1f)
                         },
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
+                    error = painterResource(com.example.myapplication.R.drawable.placeholder)
                 )
 
                 // Gradient Overlay

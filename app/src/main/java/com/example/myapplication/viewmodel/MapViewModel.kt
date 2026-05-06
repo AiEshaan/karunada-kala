@@ -17,10 +17,16 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
 
+import com.example.myapplication.ui.state.UiState
+import com.example.myapplication.core.utils.NetworkUtils
+
 class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ArtRepository(application)
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
     private val tag = "MapViewModel"
+
+    private val _uiState = MutableStateFlow<UiState<List<MapItem>>>(UiState.Loading)
+    val uiState: StateFlow<UiState<List<MapItem>>> = _uiState
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
@@ -99,6 +105,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     fun fetchData() {
         _isLoading.value = true
+        _uiState.value = UiState.Loading
         
         // Observe Artists
         repository.observeCollection("artists", Artist::class.java)
@@ -106,15 +113,23 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 _artists.value = artistList.map { MapItem(it, "Artists", it.name) }
                 updateDiscoveryAlert()
                 calculateNearestAndStopLoading()
+                updateUiState()
+            }
+            .catch { e ->
+                _uiState.value = UiState.Error("Failed to load map data: ${e.message}")
             }
             .launchIn(viewModelScope)
 
         // Observe Events
-        repository.observeCollection("events", Event::class.java)
+        repository.observeCollection("events", com.example.myapplication.data.model.Event::class.java)
             .onEach { eventList ->
                 _events.value = eventList.map { MapItem(it, "Events", it.title) }
                 updateDiscoveryAlert()
                 calculateNearestAndStopLoading()
+                updateUiState()
+            }
+            .catch { e ->
+                _uiState.value = UiState.Error("Failed to load map data: ${e.message}")
             }
             .launchIn(viewModelScope)
 
@@ -124,8 +139,21 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 _workshops.value = workshopList.map { MapItem(it, "Workshops", it.title) }
                 updateDiscoveryAlert()
                 calculateNearestAndStopLoading()
+                updateUiState()
+            }
+            .catch { e ->
+                _uiState.value = UiState.Error("Failed to load map data: ${e.message}")
             }
             .launchIn(viewModelScope)
+    }
+
+    private fun updateUiState() {
+        val allItems = _artists.value + _events.value + _workshops.value
+        if (allItems.isNotEmpty()) {
+            _uiState.value = UiState.Success(allItems)
+        } else if (!_isLoading.value) {
+            _uiState.value = UiState.Error("No items found on the map.")
+        }
     }
 
     private fun updateDiscoveryAlert() {

@@ -28,6 +28,7 @@ import com.example.myapplication.ui.components.DefaultEmptyState
 import com.example.myapplication.ui.components.EventCard
 import com.example.myapplication.ui.components.EventCardShimmer
 import com.example.myapplication.ui.components.KalaFilterChip
+import com.example.myapplication.ui.components.ReceiptDialog
 import com.example.myapplication.ui.components.UiStateHandler
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.ui.state.UiState
@@ -46,6 +47,8 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
     val selectedFilter by viewModel.selectedFilter.collectAsState()
     val filteredEvents by viewModel.filteredEvents.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    
+    var showReceiptFor by remember { mutableStateOf<Event?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.fetchEvents()
@@ -58,7 +61,7 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = Modifier.fillMaxSize()) {
         GrainOverlay()
 
         Scaffold(
@@ -158,6 +161,7 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
                                         isRegistering = isRegistering,
                                         onRegister = {
                                             viewModel.register(event)
+                                            showReceiptFor = event
                                         },
                                         onViewOnMap = {
                                             navController.navigate(NavRoutes.map(event.lat, event.lng))
@@ -172,6 +176,13 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
                     }
                 }
             }
+        }
+        if (showReceiptFor != null) {
+            ReceiptDialog(
+                title = showReceiptFor!!.title,
+                date = showReceiptFor!!.date,
+                onDismiss = { showReceiptFor = null }
+            )
         }
     }
 }
