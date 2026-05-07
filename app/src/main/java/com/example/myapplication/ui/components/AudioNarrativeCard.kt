@@ -16,8 +16,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,17 +31,14 @@ fun AudioNarrativeCard(audioUrl: String, title: String) {
     val lifecycleOwner = LocalLifecycleOwner.current
     
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build()
-    }
-
-    LaunchedEffect(audioUrl) {
-        val mediaItem = MediaItem.fromUri(audioUrl)
-        exoPlayer.setMediaItem(mediaItem)
-        exoPlayer.prepare()
+        ExoPlayer.Builder(context).build().apply {
+            val mediaItem = MediaItem.fromUri(audioUrl)
+            setMediaItem(mediaItem)
+            prepare()
+        }
     }
 
     var isPlaying by remember { mutableStateOf(false) }
-    var isBufferring by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -71,15 +68,12 @@ fun AudioNarrativeCard(audioUrl: String, title: String) {
         ) {
             IconButton(
                 onClick = {
-                    if (!isBufferring) {
-                        if (isPlaying) exoPlayer.pause() else exoPlayer.play()
-                        isPlaying = !isPlaying
-                    }
+                    if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                    isPlaying = !isPlaying
                 },
                 modifier = Modifier
                     .size(56.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .bounceClick()
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,

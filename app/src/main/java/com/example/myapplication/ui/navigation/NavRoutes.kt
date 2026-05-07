@@ -42,7 +42,7 @@ sealed class NavRoutes(val route: String) {
             val encodedCategory = Uri.encode(art.category)
             navController.navigate(
                 detail(
-                    art.name,
+                    Uri.encode(art.name),
                     encodedDescription,
                     encodedImageUrl,
                     encodedArtistId,
