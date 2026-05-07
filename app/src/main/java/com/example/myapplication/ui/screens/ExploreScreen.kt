@@ -2,8 +2,7 @@ package com.example.myapplication.ui.screens
 
 import android.app.Activity
 import android.content.Intent
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
+import android.net.Uri
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.util.Log
@@ -21,12 +20,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,7 +39,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,31 +47,23 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.myapplication.R
-import com.example.myapplication.core.analytics.AnalyticsHelper
 import com.example.myapplication.data.model.ArtForm
 import com.example.myapplication.ui.components.ArtCard
 import com.example.myapplication.ui.components.ArtCardShimmer
-import com.example.myapplication.ui.components.ArtOfTheDayCard
 import com.example.myapplication.ui.components.KalaFilterChip
-import com.example.myapplication.ui.components.entranceAnimation
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.viewmodel.ArtViewModel
 import com.example.myapplication.viewmodel.ChatViewModel
 import com.example.myapplication.viewmodel.JourneyViewModel
-import com.example.myapplication.viewmodel.WorkshopViewModel
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import com.example.myapplication.ui.components.AppBackgroundContainer
 import java.util.Locale
-
-import com.example.myapplication.ui.components.UiStateHandler
-import com.example.myapplication.ui.components.kalaClickable
 
 private const val TAG = "ExploreScreen"
 
@@ -83,22 +72,13 @@ private const val TAG = "ExploreScreen"
 fun ExploreScreen(
     navController: NavController,
     viewModel: ArtViewModel = viewModel(),
-    chatViewModel: ChatViewModel = viewModel(),
-    journeyViewModel: JourneyViewModel = viewModel()
+    chatViewModel: ChatViewModel = viewModel()
 ) {
     val artList by viewModel.artForms.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
-    val artLegends by viewModel.artLegends.collectAsState()
-    val isGeneratingLegend by viewModel.isGeneratingLegend.collectAsState()
-    val artOfTheDay by viewModel.artOfTheDay.collectAsState()
-
-    val enrollments by journeyViewModel.enrollments.collectAsState()
-    val registrations by journeyViewModel.registrations.collectAsState()
-    val recentSearchesList by viewModel.recentSearches.collectAsState()
-    val lastViewedArtName = remember(recentSearchesList) { recentSearchesList.firstOrNull() }
 
     var selectedCategory by remember { mutableStateOf("All") }
     val listState = rememberLazyListState()
@@ -106,15 +86,12 @@ fun ExploreScreen(
     var isSearchFocused by remember { mutableStateOf(false) }
     var isAiAssistantEnabled by remember { mutableStateOf(true) }
 
-    var selectedArtForLegend by remember { mutableStateOf<ArtForm?>(null) }
-    var showLegendSheet by remember { mutableStateOf(false) }
-
     val filteredList by remember(artList, selectedCategory, searchQuery) {
         derivedStateOf {
-            artList.asSequence().filter {
-                ((selectedCategory == "All") || (it.category == selectedCategory)) &&
+            artList.filter {
+                (selectedCategory == "All" || it.category == selectedCategory) &&
                 it.name.contains(searchQuery, ignoreCase = true)
-            }.toList()
+            }
         }
     }
 
@@ -126,160 +103,105 @@ fun ExploreScreen(
         derivedStateOf { listState.firstVisibleItemIndex }
     }
 
-    val context = LocalContext.current
-    val analytics = remember { AnalyticsHelper(context) }
-
     LaunchedEffect(Unit) {
         viewModel.fetchArtForms()
-        journeyViewModel.fetchJourney()
-        analytics.logScreenView("Explore")
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        GrainOverlay()
-
+    AppBackgroundContainer(textureAlpha = 0.04f) {
         Scaffold(
             containerColor = Color.Transparent,
         ) { padding ->
-            PullToRefreshBox(
-                isRefreshing = isLoading,
-                onRefresh = { viewModel.fetchArtForms() },
-                modifier = Modifier.padding(padding)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(bottom = 32.dp)
             ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = 32.dp)
-                ) {
-                    item {
-                        val parallaxOffset by remember {
-                            derivedStateOf {
-                                if (listState.firstVisibleItemIndex == 0) {
-                                    listState.firstVisibleItemScrollOffset * 0.5f
-                                } else 0f
-                            }
+                item {
+                    val alpha by remember {
+                        derivedStateOf {
+                            if (firstItemIndex == 0) {
+                                (1f - (firstItemScrollOffset / 500f)).coerceIn(0f, 1f)
+                            } else 0f
                         }
-
-                        val alpha by remember {
-                            derivedStateOf {
-                                if (firstItemIndex == 0) {
-                                    (1f - (firstItemScrollOffset / 500f)).coerceIn(0f, 1f)
-                                } else 0f
-                            }
-                        }
-
-                        Box(modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp)
-                            .graphicsLayer {
-                                translationY = parallaxOffset
-                                this.alpha = alpha
-                            }
-                        ) {
-                            AsyncImage(
-                                model = "https://images.unsplash.com/photo-1600100397608-f09074aa889c?q=80&w=2070&auto=format&fit=crop",
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
-                                        )
-                                    )
-                            )
-                            HeaderSection(
-                                isAiAssistantEnabled = isAiAssistantEnabled,
-                                onAiAssistantToggle = { isAiAssistantEnabled = it },
-                                onNotificationClick = { navController.navigate(NavRoutes.Notifications.route) },
-                                isDark = true
-                            )
+                    }
+                    val translationY by remember {
+                        derivedStateOf {
+                            if (firstItemIndex == 0) {
+                                (firstItemScrollOffset * 0.3f)
+                            } else 0f
                         }
                     }
 
-                    item {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        SearchSection(
-            searchQuery = searchQuery,
-            onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-            isSearchFocused = isSearchFocused,
-            onFocusChange = { isSearchFocused = it },
-            suggestions = suggestions,
-            recentSearches = recentSearches
-        ) { suggestion ->
-            viewModel.onSearchQueryChange(suggestion)
-            viewModel.addRecentSearch(suggestion)
-        }
-
-                            CategoriesSection(
-                                selectedCategory = selectedCategory,
-                                onCategorySelect = { selectedCategory = it }
-                            )
-                        }
+                    Box(modifier = Modifier.graphicsLayer {
+                        this.alpha = alpha
+                        this.translationY = translationY
+                    }) {
+                        HeaderSection(
+                            isAiAssistantEnabled = isAiAssistantEnabled,
+                            onAiAssistantToggle = { isAiAssistantEnabled = it }
+                        )
                     }
+                }
 
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SearchSection(
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                            isSearchFocused = isSearchFocused,
+                            onFocusChange = { isSearchFocused = it },
+                            suggestions = suggestions,
+                            recentSearches = recentSearches,
+                            onSuggestionClick = { suggestion ->
+                                viewModel.onSearchQueryChange(suggestion)
+                                viewModel.addRecentSearch(suggestion)
+                            }
+                        )
+
+                        CategoriesSection(
+                            selectedCategory = selectedCategory,
+                            onCategorySelect = { selectedCategory = it }
+                        )
+                    }
+                }
+
+                if (artList.isNotEmpty() && !isLoading) {
                     item {
-                        artOfTheDay?.let { art ->
-                            ArtOfTheDayCard(
+                        RecommendedSection(
+                            artList = artList,
+                            navController = navController,
+                            onLikeToggle = { viewModel.toggleLike(it) }
+                        )
+                    }
+                }
+
+                // 4. Staggered Art Grid
+                if (isLoading && artList.isEmpty()) {
+                    items(4) { ArtCardShimmer() }
+                } else {
+                    itemsIndexed(filteredList) { index, art ->
+                        if (index >= filteredList.size - 1 && searchQuery.isEmpty() && selectedCategory == "All") {
+                            LaunchedEffect(Unit) {
+                                viewModel.loadMoreArtForms()
+                            }
+                        }
+                        StaggeredAnimatedItem(index = index) {
+                            ArtCard(
                                 art = art,
-                                onClick = { NavRoutes.navigateToDetail(navController, art) }
-                            )
-                        }
-                    }
-
-                    // NEW: Continue Journey Section
-                    if (enrollments.isNotEmpty() || registrations.isNotEmpty() || lastViewedArtName != null) {
-                        item {
-                            ContinueJourneySection(
-                                enrollments = enrollments,
-                                registrations = registrations,
-                                lastViewedArtName = lastViewedArtName,
-                                navController = navController
-                            )
-                        }
-                    }
-
-                    if (artList.isNotEmpty() && !isLoading) {
-                        item {
-                            RecommendedSection(
-                                artList = artList,
-                                navController = navController,
-                                onLikeToggle = { viewModel.toggleLike(it) }
-                            )
-                        }
-                    }
-
-                    // 4. Staggered Art Grid
-                    if (isLoading && artList.isEmpty()) {
-                        items(4) { ArtCardShimmer() }
-                    } else {
-                        itemsIndexed(filteredList) { index, art ->
-                            if (index >= filteredList.size - 1 && searchQuery.isEmpty() && selectedCategory == "All") {
-                                LaunchedEffect(Unit) {
-                                    viewModel.loadMoreArtForms()
+                                onNavigate = {
+                                    viewModel.addRecentSearch(art.name)
+                                    NavRoutes.navigateToDetail(navController, art)
+                                },
+                                onLikeToggle = {
+                                    viewModel.toggleLike(art.id)
                                 }
-                            }
-                            StaggeredAnimatedItem(index = index) {
-                                ArtCard(
-                                    art = art,
-                                    onNavigate = {
-                                        viewModel.addRecentSearch(art.name)
-                                        NavRoutes.navigateToDetail(navController, art)
-                                    },
-                                    onLikeToggle = {
-                                        viewModel.toggleLike(art.id)
-                                    }
-                                )
-                            }
+                            )
                         }
                     }
+                }
 
-                    item {
-                        SanghaSection { navController.navigate(NavRoutes.Community.route) }
-                    }
+                item {
+                    SanghaSection(onJoinClick = { navController.navigate(NavRoutes.Community.route) })
                 }
             }
         }
@@ -303,83 +225,14 @@ fun ExploreScreen(
                 onDismiss = { showChat = false }
             )
         }
-
-        if (showLegendSheet && selectedArtForLegend != null) {
-            ModalBottomSheet(
-                onDismissRequest = { showLegendSheet = false },
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
-                        .padding(bottom = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        "📜 THE ANCIENT LEGEND",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        selectedArtForLegend?.name ?: "",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Spacer(Modifier.height(24.dp))
-                    
-                    if (isGeneratingLegend && !artLegends.containsKey(selectedArtForLegend?.name)) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(16.dp))
-                            Text("Kala is unrolling the archives...", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic)
-                        }
-                    } else {
-                        Crossfade(targetState = artLegends[selectedArtForLegend?.name], label = "legendFade") { legend ->
-                            Text(
-                                text = legend ?: "The archives are quiet for this art form, but its beauty speaks for itself.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center,
-                                fontStyle = FontStyle.Italic,
-                                lineHeight = 28.sp
-                            )
-                        }
-                    }
-                    
-                    Spacer(Modifier.height(32.dp))
-                    
-                    Button(
-                        onClick = { 
-                            showLegendSheet = false
-                            NavRoutes.navigateToDetail(navController, selectedArtForLegend!!)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("DIVE DEEPER INTO HISTORY")
-                    }
-                }
-            }
-        }
     }
 }
 
 @Composable
 fun HeaderSection(
     isAiAssistantEnabled: Boolean,
-    onAiAssistantToggle: (Boolean) -> Unit,
-    onNotificationClick: () -> Unit = {},
-    isDark: Boolean = false
+    onAiAssistantToggle: (Boolean) -> Unit
 ) {
-    val context = LocalContext.current
-    val notificationRepository = remember { com.example.myapplication.data.repository.NotificationRepository(context) }
-    val notifications by notificationRepository.notifications.collectAsState(initial = emptyList())
-    val unreadCount = notifications.count { !it.isRead }
-
     val infiniteTransition = rememberInfiniteTransition(label = "scrollIndicator")
     val offset by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -391,9 +244,6 @@ fun HeaderSection(
         label = "offset"
     )
 
-    val textColor = if (isDark) Color.White else MaterialTheme.colorScheme.primary
-    val subTextColor = if (isDark) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.secondary
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,35 +254,21 @@ fun HeaderSection(
                 modifier = Modifier
                     .width(40.dp)
                     .height(1.dp)
-                    .background(subTextColor)
+                    .background(MaterialTheme.colorScheme.secondary)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                stringResource(R.string.heritage_subtitle),
+                "HERITAGE OF KARNATAKA",
                 style = MaterialTheme.typography.titleMedium,
-                color = subTextColor,
-                modifier = Modifier.weight(1f)
+                color = MaterialTheme.colorScheme.secondary
             )
-            
-            IconButton(onClick = onNotificationClick) {
-                BadgedBox(
-                    badge = {
-                        if (unreadCount > 0) {
-                            Badge { Text(unreadCount.toString()) }
-                        }
-                    }
-                ) {
-                    Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = textColor)
-                }
-            }
         }
 
         Text(
-            stringResource(R.string.explore),
-            style = MaterialTheme.typography.headlineLarge,
-            color = textColor,
-            modifier = Modifier.offset(x = (-4).dp),
-            maxLines = 1
+            "Explore",
+            style = MaterialTheme.typography.displayLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.offset(x = (-4).dp)
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -440,7 +276,7 @@ fun HeaderSection(
         Text(
             text = "Discover the timeless arts, where tradition meets technology.",
             style = MaterialTheme.typography.bodyLarge,
-            color = if (isDark) Color.White.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             fontStyle = FontStyle.Italic
         )
 
@@ -454,7 +290,7 @@ fun HeaderSection(
                 .padding(horizontal = 12.dp, vertical = 4.dp)
         ) {
             Text(
-                stringResource(R.string.kala_ai_assistant),
+                "Kala AI Assistant",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -477,7 +313,7 @@ fun HeaderSection(
             modifier = Modifier.fillMaxWidth().graphicsLayer { translationY = offset }
         ) {
             Text(
-                stringResource(R.string.scroll_to_unroll),
+                "SCROLL TO UNROLL",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
                 letterSpacing = 1.sp
@@ -589,25 +425,18 @@ fun RecommendedSection(
     navController: NavController,
     onLikeToggle: (String) -> Unit
 ) {
-    Column(modifier = Modifier.padding(bottom = 32.dp).entranceAnimation(delay = 200)) {
+    Column(modifier = Modifier.padding(bottom = 32.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    "✨ BASED ON YOUR INTEREST",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.secondary,
-                    letterSpacing = 1.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "🔥 Trending in Karnataka this week",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
+            Text(
+                "RECOMMENDED FOR YOU ✨",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.secondary,
+                letterSpacing = 1.sp,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(modifier = Modifier.weight(1f))
         }
 
@@ -615,9 +444,9 @@ fun RecommendedSection(
 
         val recommended by remember(artList) {
             derivedStateOf {
-                artList.asSequence().sortedByDescending {
+                artList.sortedByDescending {
                     (if (it.isLiked) 10 else 0) + (it.viewCount / 5)
-                }.take(5).toList()
+                }.take(5)
             }
         }
 
@@ -642,124 +471,15 @@ fun RecommendedSection(
 }
 
 @Composable
-fun ContinueJourneySection(
-    enrollments: List<com.example.myapplication.data.model.Enrollment>,
-    registrations: List<com.example.myapplication.data.model.Registration>,
-    lastViewedArtName: String? = null,
-    navController: NavController
-) {
-    Column(modifier = Modifier.padding(bottom = 32.dp).entranceAnimation(delay = 100)) {
-        Text(
-            if (lastViewedArtName != null) "CONTINUE EXPLORING $lastViewedArtName 🏺" else "CONTINUE WHERE YOU LEFT 🏺",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp),
-            letterSpacing = 1.sp,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp)
-        ) {
-            enrollments.forEach { enrollment ->
-                Card(
-                    modifier = Modifier
-                        .width(280.dp)
-                        .padding(horizontal = 8.dp)
-                        .clickable { /* Navigate to workshop detail or classroom */ },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🎓", fontSize = 20.sp)
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                "Enrolled in: ${enrollment.workshopTitle}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "Workshop",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                }
-            }
-            
-            registrations.forEach { registration ->
-                Card(
-                    modifier = Modifier
-                        .width(280.dp)
-                        .padding(horizontal = 8.dp)
-                        .clickable { /* Navigate to event detail */ },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f))
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondary
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("🎪", fontSize = 20.sp)
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                registration.eventTitle,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                            Text(
-                                "Event coming up soon",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun StaggeredAnimatedItem(index: Int, content: @Composable () -> Unit) {
-    var visible by remember { mutableStateOf(false) }
-
+    val animatable = remember { Animatable(50f) }
+    val alpha = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        delay(index * 80L)
-        visible = true
+        delay(index * 100L)
+        launch { animatable.animateTo(0f, spring(stiffness = 300f, dampingRatio = 0.8f)) }
+        launch { alpha.animateTo(1f, tween(500)) }
     }
-
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(
-            initialOffsetY = { 60 },
-            animationSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.StiffnessMedium)
-        ) + fadeIn(tween(600)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        content()
-    }
+    Box(modifier = Modifier.offset(y = animatable.value.dp).alpha(alpha.value)) { content() }
 }
 
 @Composable
@@ -768,10 +488,9 @@ fun GrainOverlay() {
     val grainPoints = remember {
         val points = mutableListOf<Offset>()
         val step = 12 // Increased step for performance
-        val random = java.util.Random(42) // Use a fixed seed for stability
         for (x in 0..2000 step step) {
             for (y in 0..3000 step step) {
-                if (random.nextInt(11) > 8) {
+                if ((0..10).random() > 8) {
                     points.add(Offset(x.toFloat(), y.toFloat()))
                 }
             }
@@ -779,12 +498,11 @@ fun GrainOverlay() {
         points
     }
 
-    val color = MaterialTheme.colorScheme.onBackground
     Canvas(modifier = Modifier.fillMaxSize().alpha(0.08f)) {
         drawPoints(
             points = grainPoints,
             pointMode = PointMode.Points,
-            color = color,
+            color = Color.Black,
             strokeWidth = 1f
         )
     }
@@ -793,12 +511,12 @@ fun GrainOverlay() {
 @Composable
 fun SanghaSection(onJoinClick: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(stringResource(R.string.become_guardian), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Text("Become a Guardian", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(12.dp))
-        Text(stringResource(R.string.sangha_description), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+        Text("Join the Sangha and contribute to our living heritage archives.", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
         Spacer(modifier = Modifier.height(24.dp))
         TextButton(onClick = onJoinClick, modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(4.dp))) {
-            Text(stringResource(R.string.join_sangha), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text("JOIN THE SANGHA", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
         }
@@ -807,26 +525,23 @@ fun SanghaSection(onJoinClick: () -> Unit) {
 
 @Composable
 fun KalaAiFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val density = LocalDensity.current
     var badgeSize by remember { mutableStateOf(IntSize.Zero) }
     val offsetX = remember { Animatable(0f) }
     val offsetY = remember { Animatable(0f) }
-    val scope = rememberCoroutineScope()
+    var targetOffset by remember { mutableStateOf(Offset.Zero) }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "fabBounce")
-    val bounce by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bounce"
-    )
+    LaunchedEffect(targetOffset) {
+        coroutineScope {
+            launch { offsetX.animateTo(targetOffset.x, spring(stiffness = 300f, dampingRatio = 0.6f)) }
+            launch { offsetY.animateTo(targetOffset.y, spring(stiffness = 300f, dampingRatio = 0.6f)) }
+        }
+    }
 
     Box(
         modifier = modifier
             .onGloballyPositioned { badgeSize = it.size }
-            .offset { IntOffset(offsetX.value.toInt(), (offsetY.value + bounce.dp.toPx()).toInt()) }
+            .offset { IntOffset(offsetX.value.toInt(), offsetY.value.toInt()) }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -834,23 +549,14 @@ fun KalaAiFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
                         val position = event.changes.first().position
                         val centerX = badgeSize.width / 2f
                         val centerY = badgeSize.height / 2f
-                        val pullX = (position.x - centerX) * 0.4f
-                        val pullY = (position.y - centerY) * 0.4f
-
-                        scope.launch {
-                            offsetX.animateTo(pullX, spring(stiffness = 300f, dampingRatio = 0.6f))
-                        }
-                        scope.launch {
-                            offsetY.animateTo(pullY, spring(stiffness = 300f, dampingRatio = 0.6f))
-                        }
-
-                        if (event.changes.first().pressed.not()) {
-                            scope.launch {
-                                offsetX.animateTo(0f, spring(stiffness = 300f, dampingRatio = 0.4f))
-                            }
-                            scope.launch {
-                                offsetY.animateTo(0f, spring(stiffness = 300f, dampingRatio = 0.4f))
-                            }
+                        
+                        if (event.changes.first().pressed) {
+                            targetOffset = Offset(
+                                (position.x - centerX) * 0.4f,
+                                (position.y - centerY) * 0.4f
+                            )
+                        } else {
+                            targetOffset = Offset.Zero
                         }
                     }
                 }
@@ -859,39 +565,14 @@ fun KalaAiFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
             .size(80.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.secondary)
-            .kalaClickable { onClick() },
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            Text(stringResource(R.string.ask_kala), style = MaterialTheme.typography.labelLarge, color = Color.White, fontSize = 10.sp)
+            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Text("ASK KALA", style = MaterialTheme.typography.labelLarge, color = Color.White, fontSize = 10.sp)
         }
     }
-}
-
-@Composable
-fun TypingText(
-    text: String,
-    style: androidx.compose.ui.text.TextStyle,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    var visibleText by remember { mutableStateOf("") }
-
-    LaunchedEffect(text) {
-        visibleText = ""
-        text.forEachIndexed { i, _ ->
-            visibleText = text.substring(0, i + 1)
-            delay(25)
-        }
-    }
-
-    Text(
-        text = visibleText,
-        style = style,
-        color = color,
-        modifier = modifier
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -958,22 +639,7 @@ fun ChatBottomSheet(
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Column {
-                                if (msg.isUser) {
-                                    Text(
-                                        msg.text,
-                                        modifier = Modifier.padding(12.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White
-                                    )
-                                } else {
-                                    TypingText(
-                                        text = msg.text,
-                                        modifier = Modifier.padding(12.dp),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                }
-
+                                Text(msg.text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium, color = if(msg.isUser) Color.White else MaterialTheme.colorScheme.onBackground)
                                 if (!msg.isUser) {
                                     Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                                         IconButton(onClick = { tts?.speak(msg.text, TextToSpeech.QUEUE_FLUSH, null, "KalaSpeak") }, modifier = Modifier.size(24.dp)) {

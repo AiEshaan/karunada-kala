@@ -6,10 +6,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.core.net.toUri
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,9 +32,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.myapplication.ui.components.AppBackgroundContainer
 import com.example.myapplication.viewmodel.ArtistViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,207 +80,153 @@ fun ArtistDetailScreen(
             }
         } else {
             artist?.let { currentArtist ->
-                Scaffold(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-                    topBar = {
-                        LargeTopAppBar(
-                            title = { Text(currentArtist.name, style = MaterialTheme.typography.headlineMedium) },
-                            scrollBehavior = scrollBehavior,
-                            actions = {
-                                IconButton(onClick = {
-                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, "Check out ${currentArtist.name}, a ${currentArtist.artType} artist on Karunada Kala!")
+                AppBackgroundContainer(textureAlpha = 0.03f) {
+                    Scaffold(
+                        containerColor = Color.Transparent,
+                        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+                        topBar = {
+                            LargeTopAppBar(
+                                title = { Text(currentArtist.name, style = MaterialTheme.typography.headlineMedium) },
+                                scrollBehavior = scrollBehavior,
+                                colors = TopAppBarDefaults.largeTopAppBarColors(containerColor = Color.Transparent),
+                                actions = {
+                                    IconButton(onClick = {
+                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, "Check out ${currentArtist.name}, a ${currentArtist.artType} artist on Karunada Kala!")
+                                        }
+                                        context.startActivity(Intent.createChooser(shareIntent, "Share via"))
+                                    }) {
+                                        Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary)
                                     }
-                                    context.startActivity(Intent.createChooser(shareIntent, "Share via"))
-                                }) {
-                                    Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary)
                                 }
-                            }
-                        )
-                    }
-                ) { padding ->
-
-                    Column(
-                        modifier = Modifier
-                            .padding(padding)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-
-                        // 🔥 IMMERSIVE HERO
-                        Box(modifier = Modifier.height(380.dp)) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(currentArtist.photoUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = currentArtist.name,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                                placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
-                                error = painterResource(com.example.myapplication.R.drawable.placeholder)
                             )
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(Color.Transparent, Color.Black.copy(0.8f))
-                                        )
-                                    )
-                            )
-                            
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(24.dp)
-                            ) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    shape = RoundedCornerShape(50),
-                                ) {
-                                    Text(
-                                        text = currentArtist.artType,
-                                        color = Color.Black,
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = currentArtist.city,
-                                    color = Color.White.copy(alpha = 0.8f),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
                         }
+                    ) { padding ->
 
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // 📊 BADGE STATS
-                        Row(
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                .padding(padding)
+                                .verticalScroll(rememberScrollState())
                         ) {
-                            BadgeStat(value = "${currentArtist.experienceYears}+", label = "Years", Modifier.weight(1f))
-                            BadgeStat(value = "${currentArtist.worksCount}+", label = "Works", Modifier.weight(1f))
-                            BadgeStat(value = "${currentArtist.studentsCount}+", label = "Students", Modifier.weight(1f))
-                        }
 
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // 📝 BIO SECTION
-                        Text(
-                            text = "Legacy & Story",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(horizontal = 24.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = currentArtist.bio,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 26.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // 🎨 GALLERY SECTION
-                        if (currentArtist.galleryUrls.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 24.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Gallery & Works",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
+                            // 🔥 IMMERSIVE HERO
+                            Box(modifier = Modifier.height(380.dp)) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(currentArtist.photoUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = currentArtist.name,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
-                                Spacer(Modifier.width(8.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                    shape = RoundedCornerShape(8.dp)
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(Color.Transparent, Color.Black.copy(0.8f))
+                                            )
+                                        )
+                                )
+                                
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(24.dp)
                                 ) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        shape = RoundedCornerShape(50),
+                                    ) {
+                                        Text(
+                                            text = currentArtist.artType,
+                                            color = Color.Black,
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = "${currentArtist.galleryUrls.size} works",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary
+                                        text = currentArtist.city,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        style = MaterialTheme.typography.bodyLarge
                                     )
                                 }
                             }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
 
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            // 📊 BADGE STATS
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
                                     .padding(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                currentArtist.galleryUrls.forEach { url ->
-                                    Card(
-                                        modifier = Modifier
-                                            .size(200.dp, 280.dp)
-                                            .clip(RoundedCornerShape(16.dp)),
-                                        elevation = CardDefaults.cardElevation(2.dp)
-                                    ) {
-                                        AsyncImage(
-                                            model = url,
-                                            contentDescription = "Artist Work",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop,
-                                            placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
-                                            error = painterResource(com.example.myapplication.R.drawable.placeholder)
-                                        )
-                                    }
-                                }
+                                BadgeStat(value = "${currentArtist.experienceYears}+", label = "Years", Modifier.weight(1f))
+                                BadgeStat(value = "25+", label = "Works", Modifier.weight(1f))
+                                BadgeStat(value = "100+", label = "Students", Modifier.weight(1f))
                             }
+
+                            Spacer(modifier = Modifier.height(32.dp))
+
+                            // 📝 BIO SECTION
+                            Text(
+                                text = "Legacy & Story",
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(horizontal = 24.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = currentArtist.bio,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(horizontal = 24.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 26.sp
+                            )
+
                             Spacer(modifier = Modifier.height(40.dp))
-                        }
 
-                        // 📲 CONTACT FAB-STYLE BUTTON
-                        var isPressed by remember { mutableStateOf(false) }
-                        val scale by animateFloatAsState(if (isPressed) 0.95f else 1f)
+                            // 📲 CONTACT FAB-STYLE BUTTON
+                            var isPressed by remember { mutableStateOf(false) }
+                            val scale by animateFloatAsState(if (isPressed) 0.95f else 1f)
 
-                        Button(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                val url = "https://wa.me/${currentArtist.phone}"
-                                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp)
-                                .height(56.dp)
-                                .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                }
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onPress = {
-                                            isPressed = true
-                                            tryAwaitRelease()
-                                            isPressed = false
-                                        }
-                                    )
+                            Button(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    val url = "https://wa.me/${currentArtist.phone}"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
                                 },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text("Namaskara, Contact Artist", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp)
+                                    .height(56.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onPress = {
+                                                isPressed = true
+                                                tryAwaitRelease()
+                                                isPressed = false
+                                            }
+                                        )
+                                    },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("Namaskara, Contact Artist", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                            }
+                            
+                            Spacer(modifier = Modifier.height(48.dp))
                         }
-                        
-                        Spacer(modifier = Modifier.height(48.dp))
                     }
                 }
             }

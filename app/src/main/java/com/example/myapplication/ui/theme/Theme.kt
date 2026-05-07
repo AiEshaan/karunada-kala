@@ -32,15 +32,15 @@ private val HeritageLightColorScheme = lightColorScheme(
 
 // Dark theme is kept subtle for heritage feel
 private val HeritageDarkColorScheme = darkColorScheme(
-    primary = ArtBrandDark,
-    secondary = ArtTerraDark,
-    tertiary = ArtClayDark,
-    background = ArtBGDark,
-    surface = ArtSurfaceDark,
-    onPrimary = ArtBGDark,
-    onSecondary = Color.Black,
-    onBackground = ArtClayDark,
-    onSurface = ArtClayDark,
+    primary = ArtBG,
+    secondary = ArtTerra,
+    tertiary = ArtClay,
+    background = ArtBrand,
+    surface = Color(0xFF23443B),
+    onPrimary = ArtBrand,
+    onSecondary = Color.White,
+    onBackground = ArtBG,
+    onSurface = ArtBG,
     error = ErrorCrimson
 )
 
@@ -62,8 +62,6 @@ fun MyApplicationTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            window.statusBarColor = Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
