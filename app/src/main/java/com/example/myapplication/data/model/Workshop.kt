@@ -11,7 +11,11 @@ data class Workshop(
     @PropertyName("artistName") val artistName: String = "",
     @PropertyName("artType") val artType: String = "",
     @PropertyName("date") val date: String = "",
-    @get:PropertyName("fee") @set:PropertyName("fee") var feeValue: Any? = null,
+    /**
+     * feeRaw can be a Long (amount in INR) or a String (formatted price or "Free").
+     * This flexibility is maintained for Firestore compatibility.
+     */
+    @get:PropertyName("fee") @set:PropertyName("fee") var feeRaw: Any? = null,
     @PropertyName("availableSlots") val availableSlots: Int = 0,
     @PropertyName("imageUrl") val imageUrl: String = "",
     @PropertyName("location") val location: String = "",
@@ -20,11 +24,12 @@ data class Workshop(
 ) : MapEntity {
     @get:Exclude
     val fee: String
-        get() = when (val v = feeValue) {
+        get() = when (val v = feeRaw) {
             is Long -> if (v == 0L) "Free" else "₹$v"
+            is Number -> if (v.toLong() == 0L) "Free" else "₹$v"
             is String -> when {
-                v.isEmpty() || v == "0" -> "Free"
-                v.contains("₹") -> v
+                v.isBlank() || v == "0" -> "Free"
+                v.startsWith("₹") -> v
                 v.any { it.isDigit() } -> "₹$v"
                 else -> v
             }

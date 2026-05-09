@@ -2,37 +2,49 @@ package com.example.myapplication.data.repository
 
 import android.content.Context
 import android.util.Log
+import com.example.myapplication.data.local.ArtDao
+import com.example.myapplication.data.local.toDomain
+import com.example.myapplication.data.local.toEntity
 import com.example.myapplication.data.model.ArtForm
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
-class ArtRepository(context: Context? = null) {
-    private val db = FirebaseFirestore.getInstance()
-    private val tag = "ArtRepository"
-    private val cache = context?.let { CacheRepository(it) }
+class ArtRepository(
+    context: Context? = null,
+    private val artDao: ArtDao? = null
+) : BaseRepository(context) {
+    override val tag = "ArtRepository"
+
+    fun getLocalArtForms(): Flow<List<ArtForm>> {
+        return artDao?.getAllArtForms()?.map { entities ->
+            entities.map { it.toDomain() }
+        } ?: callbackFlow { trySend(emptyList()) }
+    }
+
+    suspend fun refreshArtForms() {
+        try {
+            val snapshot = db.collection("arts").get().await()
+            val objects = snapshot.toObjects(ArtForm::class.java)
+            artDao?.insertArtForms(objects.map { it.toEntity() })
+        } catch (e: Exception) {
+            Log.e(tag, "Error refreshing art forms from Firebase", e)
+        }
+    }
 
     suspend fun getArtForms(): Result<List<ArtForm>> {
         return try {
             val snapshot = db.collection("arts").get().await()
             val objects = snapshot.toObjects(ArtForm::class.java)
-            cache?.saveCollection("arts", objects)
+            artDao?.insertArtForms(objects.map { it.toEntity() })
             Result.success(objects)
         } catch (e: Exception) {
-            Log.e(tag, "Error fetching art forms, trying cache...", e)
-            cache?.let {
-                val typeToken = object : TypeToken<List<ArtForm>>() {}
-                val cached = it.getCollection("arts", typeToken)
-                if (cached.isNotEmpty()) return Result.success(cached)
-            }
+            Log.e(tag, "Error fetching art forms", e)
             Result.failure(e)
         }
     }
@@ -71,32 +83,6 @@ class ArtRepository(context: Context? = null) {
             }
         } catch (e: Exception) {
             Log.e(tag, "Error incrementing view count for: $artName", e)
-        }
-    }
-
-    fun <T : Any> observeCollection(collectionName: String, clazz: Class<T>): Flow<List<T>> = flow {
-        cache?.let {
-            val typeToken = TypeToken.getParameterized(List::class.java, clazz) as TypeToken<List<T>>
-            val cached = it.getCollection(collectionName, typeToken)
-            if (cached.isNotEmpty()) emit(cached)
-        }
-
-        val firestoreFlow = callbackFlow {
-            val subscription = db.collection(collectionName)
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        Log.e(tag, "Error observing collection $collectionName", error)
-                        return@addSnapshotListener
-                    }
-                    val objects = snapshot?.toObjects(clazz) ?: emptyList()
-                    trySend(objects)
-                }
-            awaitClose { subscription.remove() }
-        }
-
-        firestoreFlow.collect { objects ->
-            emit(objects)
-            cache?.saveCollection(collectionName, objects)
         }
     }
 }

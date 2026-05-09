@@ -2,6 +2,8 @@ package com.example.myapplication.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -19,16 +21,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.viewmodel.JourneyViewModel
 import androidx.navigation.NavController
@@ -53,13 +60,18 @@ fun MyJourneyScreen(
     val myChronicles by journeyViewModel.myChronicles.collectAsState()
     val userName by journeyViewModel.userName.collectAsState()
     val userAvatar by journeyViewModel.userAvatar.collectAsState()
+    val badges by journeyViewModel.badges.collectAsState()
     val isLoading by journeyViewModel.isLoading.collectAsState()
     
     LaunchedEffect(Unit) {
         journeyViewModel.fetchJourney()
     }
 
-    AppBackgroundContainer(textureAlpha = 0.02f) {
+    AppBackgroundContainer(
+        textureAlpha = 0.01f, // Phase 4.6: Cleaner background
+        showMotion = false, // Dashboard feel
+        overlayBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFdfdfd).copy(alpha = 0.5f))
+    ) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
@@ -113,6 +125,26 @@ fun MyJourneyScreen(
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                                 StatsCard(registrations.count(), myEnrollments.count(), myChronicles.count())
+                            }
+                        }
+
+                        // 🏆 Badges Gallery
+                        if (badges.isNotEmpty()) {
+                            item {
+                                SectionHeader("🏆 Cultural Milestones", Modifier.padding(horizontal = 16.dp))
+                            }
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp)
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    badges.forEachIndexed { index, badge ->
+                                        BadgeItem(badge, index)
+                                    }
+                                }
                             }
                         }
 
@@ -247,7 +279,7 @@ fun StaggeredJourneyItem(index: Int, content: @Composable () -> Unit) {
     }
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically { 50 } + fadeIn(),
+        enter = slideInHorizontally { -50 } + fadeIn(animationSpec = spring(dampingRatio = 0.8f)),
         modifier = Modifier.padding(horizontal = 16.dp)
     ) {
         content()
@@ -286,7 +318,10 @@ fun StatsCard(eventCount: Int, workshopCount: Int, chronicleCount: Int) {
 fun StatItem(count: Int, label: String, icon: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(icon, fontSize = 18.sp)
-        Text(text = count.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+        com.example.myapplication.ui.components.CountUpText(
+            targetValue = count,
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, color = Color.White)
+        )
         Text(text = label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), fontSize = 8.sp)
     }
 }
@@ -418,5 +453,69 @@ fun EmptyJourneyState(onExploreClick: () -> Unit) {
             Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
         }
+    }
+}
+
+@Composable
+fun BadgeItem(badge: com.example.myapplication.data.model.Badge, index: Int) {
+    val haptic = LocalHapticFeedback.current
+    var hasBursted by remember { mutableStateOf(false) }
+    
+    val scale by animateFloatAsState(
+        targetValue = if (badge.isUnlocked) 1f else 0.8f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f),
+        label = "badgeScale"
+    )
+
+    LaunchedEffect(badge.isUnlocked) {
+        if (badge.isUnlocked && !hasBursted) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            hasBursted = true
+        }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(100.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (badge.isUnlocked) {
+                com.example.myapplication.ui.components.PulseAnimation {
+                    Surface(
+                        modifier = Modifier.size(64.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        shape = CircleShape,
+                        border = BorderStroke(2.dp, Color(0xFFD4AF37))
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(badge.icon, fontSize = 32.sp)
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    modifier = Modifier.size(64.dp),
+                    color = Color.LightGray.copy(alpha = 0.2f),
+                    shape = CircleShape
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("🔒", fontSize = 24.sp, modifier = Modifier.alpha(0.5f))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            badge.name,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
     }
 }

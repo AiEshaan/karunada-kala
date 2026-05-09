@@ -12,11 +12,12 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 import com.example.myapplication.ui.state.UiState
-import com.example.myapplication.core.utils.NetworkUtils
+import com.example.myapplication.data.local.AppDatabase
 
 class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = ArtRepository(application)
+    private val database = AppDatabase.getDatabase(application)
+    private val repository = ArtRepository(application, database.artDao())
     private val geminiRepository = GeminiRepository()
     private val searchPrefs = SearchPrefsRepository(application)
 
@@ -67,7 +68,23 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
     private val trendingItemsList = listOf("Yakshagana", "Channapatna Toys", "Mysore Silk", "Lambani Craft")
 
     init {
-        loadMoreArtForms()
+        // 1. Observe Local Cache (Instant Load)
+        viewModelScope.launch {
+            repository.getLocalArtForms().collect { items ->
+                if (items.isNotEmpty()) {
+                    _artForms.value = items
+                    _artFormsState.value = UiState.Success(items)
+                }
+            }
+        }
+        
+        // 2. Refresh from Cloud (Zero-Latency Sync)
+        viewModelScope.launch {
+            _isLoading.value = true
+            repository.refreshArtForms()
+            _isLoading.value = false
+        }
+
         viewModelScope.launch {
             searchPrefs.recentSearchesFlow.collectLatest { searches ->
                 _recentSearches.value = searches
@@ -123,7 +140,7 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             _isGeneratingLegend.value = true
-            // Add a small delay for "drama" as requested in Phase 2
+            // Intentional latency to allow the generative UI transition to feel natural
             kotlinx.coroutines.delay(800)
             geminiRepository.generatePersonalizedLegend(artName).onSuccess { legend ->
                 legendCache[artName] = legend

@@ -47,6 +47,7 @@ import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.core.utils.TimeUtils
 import com.example.myapplication.ui.components.UiStateHandler
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.ui.components.bouncyClickable
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,7 +75,10 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
         }
     }
 
-    AppBackgroundContainer(textureAlpha = 0.04f) {
+    AppBackgroundContainer(
+        textureAlpha = 0.05f,
+        overlayBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFDF8F2).copy(alpha = 0.7f)) // Phase 4.5: Paper-like storytelling vibe
+    ) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -103,13 +107,14 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
             floatingActionButton = {
                 FloatingActionButton(
                     onClick = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         showCreateSheet = true 
                     },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.White,
                     shape = CircleShape,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(16.dp).bouncyClickable(
+                        onClick = { showCreateSheet = true }
+                    )
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Chronicle moment")
                 }
@@ -138,8 +143,10 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(postList, key = { it.id }) { post ->
-                                CulturalPostCard(post)
+                            itemsIndexed(postList, key = { _, post -> post.id }) { index, post ->
+                                FadeInItem(delayMillis = (index % 4) * 100) {
+                                    CulturalPostCard(post)
+                                }
                             }
                         }
                     }
@@ -170,15 +177,19 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel = viewModel()) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
-    Card(
-        shape = RoundedCornerShape(24.dp),
+    PressableCard(
+        onClick = { /* Detail or expand */ },
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            .animateContentSize()
     ) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+        ) {
         Column {
             Box(modifier = Modifier.fillMaxWidth()) {
                 AsyncImage(
@@ -257,30 +268,13 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel = viewModel()) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val likeScale = remember { Animatable(1f) }
-                        val coroutineScope = rememberCoroutineScope()
-                        
-                        IconButton(
+                        com.example.myapplication.ui.components.LikeButton(
+                            isLiked = isLiked,
                             onClick = { 
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                coroutineScope.launch {
-                                    likeScale.animateTo(1.5f, tween(100))
-                                    likeScale.animateTo(1f, spring(Spring.DampingRatioHighBouncy))
-                                }
                                 viewModel.toggleLike(post.id) 
-                            },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Like",
-                                tint = if (isLiked) Color(0xFFE91E63) else Color.Gray.copy(alpha = 0.5f),
-                                modifier = Modifier.size(20.dp).graphicsLayer {
-                                    scaleX = likeScale.value
-                                    scaleY = likeScale.value
-                                }
-                            )
-                        }
+                            }
+                        )
                         Text(
                             "${post.likes}", 
                             style = MaterialTheme.typography.labelSmall, 
@@ -524,7 +518,11 @@ fun CreatePostSheet(onDismiss: () -> Unit, onPost: (Uri, String, String?) -> Uni
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                    com.example.myapplication.ui.components.MorphingRing(
+                        progress = 0.7f, // Indeterminate simulation
+                        color = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
                 } else {
                     Text("CHRONICLE NOW", fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
                 }

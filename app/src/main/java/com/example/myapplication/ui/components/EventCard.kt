@@ -69,18 +69,21 @@ fun EventCard(
                         )
                         
                         // Urgency Badge
-                        Surface(
-                            modifier = Modifier.padding(12.dp).align(Alignment.TopStart),
-                            color = Color.Black.copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(8.dp)
+                        com.example.myapplication.ui.components.PulseAnimation(
+                            modifier = Modifier.padding(12.dp).align(Alignment.TopStart)
                         ) {
-                            Text(
-                                text = "🔥 Filling Fast",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "🔥 Filling Fast",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
 
                         Box(
@@ -151,7 +154,9 @@ fun EventCard(
                                                 putExtra(CalendarContract.EXTRA_EVENT_END_TIME, cal.timeInMillis + 3600000)
                                             }
                                         }
-                                    } catch (ignored: Exception) {}
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("EventCard", "Failed to parse date: $date", e)
+                                    }
                                 }
                                 context.startActivity(intent)
                             }) {
@@ -212,20 +217,22 @@ fun EventCard(
                             Text("View on Map", fontWeight = FontWeight.Bold)
                         }
                         
-                        KalaAnimatedActionButton(
-                            text = "Register Interest",
+                        val buttonState = when {
+                            isRegistered -> ButtonState.SUCCESS
+                            isRegistering -> ButtonState.LOADING
+                            else -> ButtonState.IDLE
+                        }
+
+                        MorphingButton(
+                            state = buttonState,
+                            idleText = "Register Interest",
                             successText = "Registered",
-                            isLoading = isRegistering,
-                            isSuccess = isRegistered,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onRegister()
-                            },
+                            onClick = onRegister,
                             modifier = Modifier
                                 .weight(1.5f)
                                 .height(48.dp),
                             containerColor = MaterialTheme.colorScheme.primary,
-                            successColor = Color(0xFF2E7D32)
+                            successColor = Color(0xFF1D9E75)
                         )
                     }
                 }

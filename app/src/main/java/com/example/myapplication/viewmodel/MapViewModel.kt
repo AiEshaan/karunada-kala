@@ -7,7 +7,12 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.ui.model.MapItem
-import com.example.myapplication.data.repository.ArtRepository
+import com.example.myapplication.data.model.Artist
+import com.example.myapplication.data.model.Event
+import com.example.myapplication.data.model.Workshop
+import com.example.myapplication.data.repository.ArtistRepository
+import com.example.myapplication.data.repository.EventRepository
+import com.example.myapplication.data.repository.WorkshopRepository
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.*
@@ -15,7 +20,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.tasks.await
 
 class MapViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository = ArtRepository()
+    private val artistRepository = ArtistRepository(application)
+    private val eventRepository = EventRepository(application)
+    private val workshopRepository = WorkshopRepository(application)
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(application)
     private val TAG = "MapViewModel"
 
@@ -25,9 +32,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedFilter = MutableStateFlow("All")
     val selectedFilter: StateFlow<String> = _selectedFilter
 
-    private val _artists = MutableStateFlow<List<MapItem>>(emptyList())
-    private val _events = MutableStateFlow<List<MapItem>>(emptyList())
-    private val _workshops = MutableStateFlow<List<MapItem>>(emptyList())
+    private val _artistList = MutableStateFlow<List<MapItem>>(emptyList())
+    private val _eventList = MutableStateFlow<List<MapItem>>(emptyList())
+    private val _workshopList = MutableStateFlow<List<MapItem>>(emptyList())
     
     private val _nearestItem = MutableStateFlow<MapItem?>(null)
     val nearestItem: StateFlow<MapItem?> = _nearestItem
@@ -36,7 +43,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     val userLocation: StateFlow<Location?> = _userLocation
 
     val mapItems: StateFlow<List<MapItem>> = combine(
-        _artists, _events, _workshops, _selectedFilter
+        _artistList, _eventList, _workshopList, _selectedFilter
     ) { artists, events, workshops, filter ->
         val all = artists + events + workshops
         if (filter == "All") all else all.filter { it.type.equals(filter, ignoreCase = true) }
@@ -47,9 +54,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
             try {
                 // Parallelize Firestore calls
-                val artistsDeferred = async { repository.getArtists() }
-                val eventsDeferred = async { repository.getEvents() }
-                val workshopsDeferred = async { repository.getWorkshops() }
+                val artistsDeferred = async { artistRepository.getArtists() }
+                val eventsDeferred = async { eventRepository.getEvents() }
+                val workshopsDeferred = async { workshopRepository.getWorkshops() }
 
                 val artistsResult = artistsDeferred.await()
                 val eventsResult = eventsDeferred.await()
@@ -57,17 +64,17 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Batch the state updates to avoid multiple rapid emissions of mapItems
                 withContext(Dispatchers.Default) {
-                    val artists = artistsResult.getOrDefault(emptyList()).map { MapItem(it, "Artists", it.name) }
-                    val events = eventsResult.getOrDefault(emptyList()).map { MapItem(it, "Events", it.title) }
-                    val workshops = workshopsResult.getOrDefault(emptyList()).map { MapItem(it, "Workshops", it.title) }
+                    val aList: List<MapItem> = artistsResult.getOrDefault(emptyList<Artist>()).map { artist: Artist -> MapItem(artist, "Artists", artist.name) }
+                    val eList: List<MapItem> = eventsResult.getOrDefault(emptyList<Event>()).map { event: Event -> MapItem(event, "Events", event.title) }
+                    val wList: List<MapItem> = workshopsResult.getOrDefault(emptyList<Workshop>()).map { workshop: Workshop -> MapItem(workshop, "Workshops", workshop.title) }
                     
-                    // Update states atomically in the main thread (state flows are thread safe but combine will react to each)
-                    // Actually, even better: update them on the main thread to ensure sequential processing if needed
+                    val combined: List<MapItem> = aList + eList + wList
+
                     withContext(Dispatchers.Main) {
-                        _artists.value = artists
-                        _events.value = events
-                        _workshops.value = workshops
-                        calculateNearest(artists + events + workshops)
+                        _artistList.value = aList
+                        _eventList.value = eList
+                        _workshopList.value = wList
+                        calculateNearest(combined)
                     }
                 }
             } catch (e: Exception) {
@@ -85,11 +92,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 val location = fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null).await()
                 _userLocation.value = location
                 location?.let { 
-                    calculateNearest(_artists.value + _events.value + _workshops.value, it.latitude, it.longitude)
+                    calculateNearest(_artistList.value + _eventList.value + _workshopList.value, it.latitude, it.longitude)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Location unavailable, using default", e)
-                calculateNearest(_artists.value + _events.value + _workshops.value)
+                calculateNearest(_artistList.value + _eventList.value + _workshopList.value)
             }
         }
     }

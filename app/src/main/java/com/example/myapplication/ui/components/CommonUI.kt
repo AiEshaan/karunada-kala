@@ -1,30 +1,299 @@
 package com.example.myapplication.ui.components
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.PointMode
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Image
-import com.example.myapplication.R
-import com.example.myapplication.ui.theme.ArtBG
 import com.example.myapplication.ui.state.UiState
+
+/**
+ * 🥇 6. LOADING → CONTENT ANIMATION (AI / Data)
+ */
+@Composable
+fun LoadingToContent(
+    isLoading: Boolean, 
+    loadingPlaceholder: @Composable () -> Unit = { Text("Kala is thinking...") },
+    content: @Composable () -> Unit
+) {
+    Crossfade(targetState = isLoading, label = "loadingToContent") { loading ->
+        if (loading) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                loadingPlaceholder()
+            }
+        } else {
+            content()
+        }
+    }
+}
+
+/**
+ * 🌿 KALA BACKGROUND (Legacy Wrapper)
+ */
+@Composable
+fun KalaBackground(
+    content: @Composable () -> Unit
+) {
+    // Now just a simple box to maintain compatibility, 
+    // real background is in AppBackgroundContainer
+    Box(modifier = Modifier.fillMaxSize()) {
+        content()
+    }
+}
+
+/**
+ * 🥇 9. SHIMMER LOADING (Premium feel)
+ */
+@Composable
+fun KalaShimmer(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp)
+) {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha"
+    )
+
+    Box(
+        modifier = modifier
+            .background(Color.Gray.copy(alpha = alpha), shape)
+    )
+}
+
+/**
+ * 🥇 1. CARD PRESS ANIMATION (Explore / Cards)
+ */
+@Composable
+fun PressableCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    var pressed by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = tween(120),
+        label = "scale"
+    )
+
+    Box(
+        modifier = modifier
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        try {
+                            awaitRelease()
+                        } finally {
+                            pressed = false
+                        }
+                    },
+                    onTap = { onClick() }
+                )
+            }
+    ) {
+        content()
+    }
+}
+
+/**
+ * 🥇 2. LIKE BUTTON ANIMATION ❤️ (Chronicles)
+ * Sequence: 1.0 -> 0.8 -> 1.3 -> 1.0
+ */
+@Composable
+fun LikeButton(
+    isLiked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+
+    IconButton(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+            scope.launch {
+                scale.animateTo(0.8f, spring(stiffness = 500f))
+                scale.animateTo(1.3f, spring(dampingRatio = 0.4f, stiffness = 600f)) // Celebratory burst
+                scale.animateTo(1f, spring(stiffness = 400f))
+            }
+        },
+        modifier = modifier.graphicsLayer {
+            scaleX = scale.value
+            scaleY = scale.value
+        }
+    ) {
+        Icon(
+            imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            contentDescription = null,
+            tint = if (isLiked) Color(0xFFC34A2C) else Color.Gray, // Terracotta color
+            modifier = Modifier.size(28.dp)
+        )
+    }
+}
+
+/**
+ * 🥇 3. BUTTON STATE ANIMATION (Join / Enroll / Register)
+ */
+@Composable
+fun KalaAnimatedActionButton(
+    text: String,
+    successText: String,
+    isLoading: Boolean,
+    isSuccess: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    successColor: Color = Color(0xFF1D9E75)
+) {
+    val color by animateColorAsState(
+        targetValue = if (isSuccess) successColor else containerColor,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "buttonColor"
+    )
+
+    Button(
+        onClick = onClick,
+        enabled = !isLoading && !isSuccess,
+        modifier = modifier.bouncyClickable(onClick = onClick),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            disabledContainerColor = if (isSuccess) successColor else color.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Crossfade(targetState = isLoading to isSuccess, label = "buttonContent") { (loading, success) ->
+            when {
+                loading -> UnrollingScrollAnimation(
+                    color = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+                success -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(successText, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(8.dp))
+                    Text("✓", fontWeight = FontWeight.Bold)
+                }
+                else -> Text(text, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/**
+ * 🥇 4. FADE-IN ANIMATION (Cards / Lists)
+ */
+@Composable
+fun FadeInItem(
+    modifier: Modifier = Modifier,
+    delayMillis: Int = 0,
+    content: @Composable () -> Unit
+) {
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(delayMillis.toLong())
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(spring(dampingRatio = 0.7f, stiffness = 400f)) + slideInVertically(
+            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+            initialOffsetY = { 20 }
+        ),
+        modifier = modifier
+    ) {
+        content()
+    }
+}
+
+/**
+ * 🥇 10. HAPTIC FEEDBACK (Feels real 🔥)
+ */
+fun Modifier.kalaClickable(
+    hapticType: HapticFeedbackType = HapticFeedbackType.TextHandleMove, // Default to light tap
+    onClick: () -> Unit
+) = composed {
+    this.bouncyClickable(onClick = onClick)
+}
+
+/**
+ * 🥇 8. PARALLAX SCROLL (Explore Hero)
+ */
+fun Modifier.parallaxScroll(scrollState: ScrollState, factor: Float = 0.5f) = graphicsLayer {
+    translationY = scrollState.value * factor
+}
+
+/**
+ * Micro-interaction: Scale down on press
+ */
+fun Modifier.bounceClick() = composed { bouncyClickable(onClick = {}) }
+
+/**
+ * Subtle entrance animation for list items
+ */
+fun Modifier.entranceAnimation(delay: Int = 0) = composed {
+    var visible by remember { mutableStateOf(false) }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "entranceAlpha"
+    )
+    val translateY by animateFloatAsState(
+        targetValue = if (visible) 0f else 20f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "entranceTranslate"
+    )
+
+    LaunchedEffect(Unit) {
+        delay(delay.toLong())
+        visible = true
+    }
+
+    this
+        .graphicsLayer(alpha = alpha, translationY = translateY)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,16 +304,20 @@ fun KalaFilterChip(
     modifier: Modifier = Modifier,
     icon: String? = null
 ) {
+    val haptic = LocalHapticFeedback.current
     FilterChip(
         selected = selected,
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         label = {
             Text(
                 text = if (icon != null) "$icon $label" else label,
                 style = MaterialTheme.typography.labelLarge
             )
         },
-        modifier = modifier.padding(end = 8.dp),
+        modifier = modifier.padding(end = 8.dp).bounceClick(),
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = MaterialTheme.colorScheme.primary,
             selectedLabelColor = Color.White,
@@ -65,9 +338,13 @@ fun KalaActionButton(
     contentColor: Color = Color.White,
     isLoading: Boolean = false
 ) {
+    val haptic = LocalHapticFeedback.current
     Button(
-        onClick = onClick,
-        modifier = modifier,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        },
+        modifier = modifier.bounceClick(),
         enabled = enabled && !isLoading,
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
@@ -93,7 +370,7 @@ fun <T> UiStateHandler(
     onRetry: () -> Unit,
     loadingContent: @Composable () -> Unit = {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            UnrollingScrollAnimation(color = MaterialTheme.colorScheme.primary)
         }
     },
     emptyContent: @Composable () -> Unit = {
@@ -105,7 +382,8 @@ fun <T> UiStateHandler(
         targetState = uiState,
         label = "uiStateTransition",
         transitionSpec = {
-            fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+            fadeIn(animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)) togetherWith 
+            fadeOut(animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f))
         }
     ) { state ->
         when (state) {
@@ -126,9 +404,9 @@ fun <T> UiStateHandler(
 
 @Composable
 fun DefaultEmptyState(
-    icon: String = "🎭",
-    title: String = "No items found",
-    description: String = "Check back soon for updates!"
+    icon: String = "🏺",
+    title: String = "The archives are quiet...",
+    description: String = "Every masterpiece starts with a single step. Discover something new today!"
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -189,49 +467,3 @@ fun ErrorState(message: String, onRetry: () -> Unit) {
         }
     }
 }
-
-val AppGradientBackground = Brush.verticalGradient(
-    colors = listOf(ArtBG, Color.White)
-)
-
-/**
- * Global background container with cultural texture and soft radial glow.
- */
-@Composable
-fun AppBackgroundContainer(
-    textureAlpha: Float = 0.04f,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppGradientBackground)
-    ) {
-        // 🌿 Cultural texture layer (Very subtle)
-        Image(
-            painter = painterResource(id = R.drawable.karnataka_texture),
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(alpha = textureAlpha),
-            contentScale = ContentScale.Crop
-        )
-
-        // ✨ Soft radial glow for depth
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.08f),
-                            Color.Transparent
-                        )
-                    )
-                )
-        )
-        
-        content()
-    }
-}
-

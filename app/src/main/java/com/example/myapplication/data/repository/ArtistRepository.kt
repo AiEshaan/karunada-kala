@@ -7,10 +7,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.tasks.await
 
-class ArtistRepository(context: Context? = null) {
-    private val db = FirebaseFirestore.getInstance()
-    private val tag = "ArtistRepository"
-    private val cache = context?.let { CacheRepository(it) }
+class ArtistRepository(context: Context? = null) : BaseRepository(context) {
+    override val tag = "ArtistRepository"
 
     suspend fun getArtists(): Result<List<Artist>> {
         return try {

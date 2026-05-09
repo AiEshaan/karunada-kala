@@ -23,9 +23,9 @@ object KalaElevation {
 fun KalaGlassCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(24.dp),
-    elevation: Dp = KalaElevation.Medium,
-    alpha: Float = 0.65f,
+    shape: Shape = RoundedCornerShape(20.dp),
+    elevation: Dp = 8.dp, // Phase 3: Floating feel
+    alpha: Float = 0.85f, // Phase 3: Translucent cards
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(

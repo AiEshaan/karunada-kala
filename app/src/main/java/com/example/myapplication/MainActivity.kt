@@ -26,9 +26,25 @@ import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.viewmodel.ArtViewModel
 import com.example.myapplication.viewmodel.ChatViewModel
 import android.util.Log
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
+import com.example.myapplication.ui.components.bouncyClickable
+import androidx.compose.animation.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,129 +106,200 @@ fun KarunadaKalaApp() {
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    tonalElevation = 0.dp // Flat editorial look
-                ) {
-                    NavigationBarItem(
-                        selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Explore.route } == true,
-                        onClick = { navController.navigate(NavRoutes.Explore.route) },
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Explore") },
-                        label = { Text("Explore", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                            unselectedIconColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            unselectedTextColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        )
+                AnimatedBottomBar(
+                    navController = navController,
+                    currentDestination = currentDestination
+                )
+            }
+        }
+    ) { paddingValues ->
+        @OptIn(ExperimentalSharedTransitionApi::class)
+        SharedTransitionLayout {
+            NavHost(
+                navController = navController,
+                startDestination = if (isOnboardingDone) NavRoutes.Explore.route else NavRoutes.Onboarding.route,
+                modifier = Modifier.padding(if (showBottomBar) paddingValues else androidx.compose.foundation.layout.PaddingValues(0.dp)),
+                enterTransition = { fadeIn(tween(300)) + slideInHorizontally(initialOffsetX = { 300 }) },
+                exitTransition = { fadeOut(tween(300)) + slideOutHorizontally(targetOffsetX = { -300 }) },
+                popEnterTransition = { fadeIn(tween(300)) + slideInHorizontally(initialOffsetX = { -300 }) },
+                popExitTransition = { fadeOut(tween(300)) + slideOutHorizontally(targetOffsetX = { 300 }) }
+            ) {
+                composable(NavRoutes.Onboarding.route) {
+                    OnboardingScreen(onFinish = {
+                        prefs.edit().putBoolean("onboarding_done", true).apply()
+                        navController.navigate(NavRoutes.Explore.route) {
+                            popUpTo(NavRoutes.Onboarding.route) { inclusive = true }
+                        }
+                    })
+                }
+                composable(NavRoutes.Explore.route) {
+                    ExploreScreen(
+                        navController, 
+                        viewModel = artViewModel, 
+                        chatViewModel = chatViewModel,
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@composable
                     )
-                    NavigationBarItem(
-                        selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Map.route } == true,
-                        onClick = { navController.navigate(NavRoutes.Map.route) },
-                        icon = { Icon(Icons.Default.LocationOn, contentDescription = "Map") },
-                        label = { Text("Map", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                            unselectedIconColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            unselectedTextColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        )
+                }
+                composable(
+                    route = NavRoutes.Map.route,
+                    arguments = listOf(
+                        navArgument("lat") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("lng") { type = NavType.StringType; nullable = true; defaultValue = null }
                     )
-                    NavigationBarItem(
-                        selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Events.route } == true,
-                        onClick = { navController.navigate(NavRoutes.Events.route) },
-                        icon = { Icon(Icons.Default.DateRange, contentDescription = "Events") },
-                        label = { Text("Events", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                            unselectedIconColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            unselectedTextColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        )
+                ) { backStackEntry ->
+                    val lat = backStackEntry.arguments?.getString("lat")?.toDoubleOrNull()
+                    val lng = backStackEntry.arguments?.getString("lng")?.toDoubleOrNull()
+                    MapScreen(navController, initialLat = lat, initialLng = lng)
+                }
+                composable(NavRoutes.Events.route) {
+                    EventsScreen(navController = navController)
+                }
+                composable(NavRoutes.Community.route) {
+                    CommunityScreen()
+                }
+                composable(NavRoutes.Journey.route) {
+                    MyJourneyScreen(navController = navController)
+                }
+                composable(NavRoutes.Detail.route) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("name") ?: ""
+                    val description = backStackEntry.arguments?.getString("description") ?: ""
+                    val imageUrl = backStackEntry.arguments?.getString("imageUrl") ?: ""
+                    val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
+                    val category = backStackEntry.arguments?.getString("category") ?: "Art"
+
+                    DetailScreen(
+                        name, 
+                        description, 
+                        imageUrl, 
+                        artistId, 
+                        category, 
+                        navController, 
+                        viewModel = artViewModel,
+                        chatViewModel = chatViewModel,
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@composable
                     )
-                    NavigationBarItem(
-                        selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Community.route } == true,
-                        onClick = { navController.navigate(NavRoutes.Community.route) },
-                        icon = { Icon(Icons.Default.Face, contentDescription = "Chronicles") },
-                        label = { Text("Chronicles", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                            unselectedIconColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            unselectedTextColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = currentDestination?.hierarchy?.any { it.route == NavRoutes.Journey.route } == true,
-                        onClick = { navController.navigate(NavRoutes.Journey.route) },
-                        icon = { Icon(Icons.Default.AccountBox, contentDescription = "Journey") },
-                        label = { Text("Journey", fontWeight = FontWeight.Bold, fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f),
-                            unselectedIconColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            unselectedTextColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                        )
+                }
+                composable(NavRoutes.ArtistDetail.route) { backStackEntry ->
+                    val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
+                    ArtistDetailScreen(
+                        artistId = artistId,
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@composable
                     )
                 }
             }
         }
-    ) { paddingValues ->
+    }
+}
 
-        NavHost(
-            navController = navController,
-            startDestination = if (isOnboardingDone) NavRoutes.Explore.route else NavRoutes.Onboarding.route,
-            modifier = Modifier.padding(if (showBottomBar) paddingValues else androidx.compose.foundation.layout.PaddingValues(0.dp))
-        ) {
-            composable(NavRoutes.Onboarding.route) {
-                OnboardingScreen(onFinish = {
-                    prefs.edit().putBoolean("onboarding_done", true).apply()
-                    navController.navigate(NavRoutes.Explore.route) {
-                        popUpTo(NavRoutes.Onboarding.route) { inclusive = true }
-                    }
-                })
-            }
-            composable(NavRoutes.Explore.route) {
-                ExploreScreen(navController, viewModel = artViewModel, chatViewModel = chatViewModel)
-            }
-            composable(
-                route = NavRoutes.Map.route,
-                arguments = listOf(
-                    navArgument("lat") { type = NavType.StringType; nullable = true; defaultValue = null },
-                    navArgument("lng") { type = NavType.StringType; nullable = true; defaultValue = null }
+@Composable
+fun AnimatedBottomBar(
+    navController: androidx.navigation.NavHostController,
+    currentDestination: androidx.navigation.NavDestination?
+) {
+    val navItems = listOf(
+        Triple(NavRoutes.Explore, Icons.Default.Home, "Explore"),
+        Triple(NavRoutes.Map, Icons.Default.LocationOn, "Map"),
+        Triple(NavRoutes.Events, Icons.Default.DateRange, "Events"),
+        Triple(NavRoutes.Community, Icons.Default.Face, "Chronicles"),
+        Triple(NavRoutes.Journey, Icons.Default.AccountBox, "Journey")
+    )
+
+    val selectedIndex = navItems.indexOfFirst { (route, _, _) ->
+        currentDestination?.hierarchy?.any { it.route == route.route } == true
+    }.coerceAtLeast(0)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp),
+        color = MaterialTheme.colorScheme.background,
+        tonalElevation = 0.dp
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val totalWidth = maxWidth
+            val itemWidth = totalWidth / navItems.size
+            
+            // Sliding Pill
+            val animatedOffset by animateDpAsState(
+                targetValue = itemWidth * selectedIndex,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+                label = "pillOffset"
+            )
+
+            Box(
+                modifier = Modifier
+                    .offset(x = animatedOffset)
+                    .width(itemWidth)
+                    .fillMaxHeight()
+                    .padding(vertical = 12.dp, horizontal = 8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF2D5A2D), RoundedCornerShape(50))
                 )
-            ) { backStackEntry ->
-                val lat = backStackEntry.arguments?.getString("lat")?.toDoubleOrNull()
-                val lng = backStackEntry.arguments?.getString("lng")?.toDoubleOrNull()
-                MapScreen(navController, initialLat = lat, initialLng = lng)
             }
-            composable(NavRoutes.Events.route) {
-                EventsScreen(navController = navController)
-            }
-            composable(NavRoutes.Community.route) {
-                CommunityScreen()
-            }
-            composable(NavRoutes.Journey.route) {
-                MyJourneyScreen(navController = navController)
-            }
-            composable(NavRoutes.Detail.route) { backStackEntry ->
-                val name = backStackEntry.arguments?.getString("name") ?: ""
-                val description = backStackEntry.arguments?.getString("description") ?: ""
-                val imageUrl = backStackEntry.arguments?.getString("imageUrl") ?: ""
-                val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
-                val category = backStackEntry.arguments?.getString("category") ?: "Art"
 
-                DetailScreen(name, description, imageUrl, artistId, category, navController, viewModel = artViewModel)
-            }
-            composable(NavRoutes.ArtistDetail.route) { backStackEntry ->
-                val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
-                ArtistDetailScreen(artistId)
+            Row(modifier = Modifier.fillMaxSize()) {
+                navItems.forEachIndexed { index, (route, icon, label) ->
+                    val isSelected = index == selectedIndex
+                    
+                    val scale by animateFloatAsState(
+                        targetValue = if (isSelected) 1.1f else 1.0f,
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+                        label = "iconScale"
+                    )
+                    
+                    val alpha by animateFloatAsState(
+                        targetValue = if (isSelected) 1.0f else 0.4f,
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+                        label = "labelAlpha"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .bouncyClickable(onClick = {
+                                if (!isSelected) {
+                                    navController.navigate(route.route) {
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            }),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                icon,
+                                contentDescription = label,
+                                tint = if (isSelected) Color.White else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.alpha(alpha),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
             }
         }
     }

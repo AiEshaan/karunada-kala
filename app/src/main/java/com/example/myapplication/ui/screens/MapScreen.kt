@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -37,6 +38,8 @@ import androidx.navigation.NavController
 import com.example.myapplication.data.model.Artist
 import com.example.myapplication.data.model.Event
 import com.example.myapplication.data.model.Workshop
+import com.example.myapplication.ui.components.MorphingButton
+import com.example.myapplication.ui.components.ButtonState
 import com.example.myapplication.ui.components.KalaActionButton
 import com.example.myapplication.ui.components.KalaFilterChip
 import com.example.myapplication.ui.model.MapItem
@@ -65,6 +68,21 @@ fun MapScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     
+    // 🏺 Ancient Parchment Map Style
+    val parchmentMapStyle = remember {
+        """
+        [
+          { "featureType": "all", "elementType": "labels.text.fill", "stylers": [ { "color": "#8b4513" } ] },
+          { "featureType": "landscape", "elementType": "geometry", "stylers": [ { "color": "#fdf8f0" } ] },
+          { "featureType": "poi", "stylers": [ { "visibility": "off" } ] },
+          { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#e5dcc5" } ] },
+          { "featureType": "road", "elementType": "labels", "stylers": [ { "visibility": "off" } ] },
+          { "featureType": "transit", "stylers": [ { "visibility": "off" } ] },
+          { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#d4e6e6" } ] },
+          { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#609393" } ] }
+        ]
+        """.trimIndent()
+    }
     val mapItems by mapViewModel.mapItems.collectAsState()
     val stableItems = remember(mapItems) { mapItems } // Removed .take(50) to allow all items
     val filterType by mapViewModel.selectedFilter.collectAsState()
@@ -87,26 +105,59 @@ fun MapScreen(
         }
     }
 
-    val mapProperties by remember {
-        mutableStateOf(MapProperties(isMyLocationEnabled = false, mapType = MapType.NORMAL))
+    val mapProperties by remember(parchmentMapStyle) {
+        mutableStateOf(
+            MapProperties(
+                isMyLocationEnabled = false, 
+                mapType = MapType.NORMAL,
+                mapStyleOptions = com.google.android.gms.maps.model.MapStyleOptions(parchmentMapStyle)
+            )
+        )
     }
 
-    // Handle deep link or initial position
+    // Handle deep link or initial position safely
     LaunchedEffect(initialLat, initialLng, mapItems) {
-        if (initialLat != null && initialLng != null) {
+        if (initialLat != null && initialLng != null && initialLat.isFinite() && initialLng.isFinite()) {
             val target = LatLng(initialLat, initialLng)
-            cameraPositionState.animate(
-                update = CameraUpdateFactory.newLatLngZoom(target, 14f),
-                durationMs = 1000
-            )
+            try {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(target, 14f),
+                    durationMs = 1000
+                )
+            } catch (e: Exception) {
+                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(target, 14f))
+            }
             // Auto-select the deep-linked item if it exists in the list
-            val item = mapItems.find { it.lat == initialLat && it.lng == initialLng }
+            val item = mapItems.find { 
+                it.lat == initialLat && it.lng == initialLng 
+            }
             if (item != null) {
                 selectedItem = item
             }
         } else if (mapItems.isEmpty()) {
+            try {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(karnatakaCenter, 7f),
+                    durationMs = 1500
+                )
+            } catch (e: Exception) {
+                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(karnatakaCenter, 7f))
+            }
+        }
+    }
+    
+    // 🎥 Cinematic 3D Camera Sweep
+    LaunchedEffect(selectedItem) {
+        selectedItem?.let { item ->
+            val targetPosition = CameraPosition.builder()
+                .target(item.position)
+                .zoom(15f)
+                .tilt(45f) // 3D Tilt
+                .bearing(30f) // Slight rotation
+                .build()
+            
             cameraPositionState.animate(
-                update = CameraUpdateFactory.newLatLngZoom(karnatakaCenter, 7f),
+                update = CameraUpdateFactory.newCameraPosition(targetPosition),
                 durationMs = 1500
             )
         }
@@ -125,7 +176,11 @@ fun MapScreen(
         }
     }
     
-    AppBackgroundContainer(textureAlpha = 0.01f) {
+    AppBackgroundContainer(
+        textureAlpha = 0f,
+        showMotion = false,
+        overlayBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFdfdfd))
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
@@ -160,21 +215,27 @@ fun MapScreen(
                             else -> "📍"
                         }
 
-                        Surface(
-                            modifier = Modifier.size(if (isDeepLinked) 48.dp else 36.dp),
-                            shape = CircleShape,
-                            color = markerColor,
-                            tonalElevation = if (isDeepLinked) 12.dp else 4.dp,
-                            border = BorderStroke(
-                                if (isDeepLinked) 3.dp else 2.dp,
-                                Color.White
-                            )
+                        val isSpecial = isDeepLinked || item.type == "Events"
+                        
+                        com.example.myapplication.ui.components.PulseAnimation(
+                            modifier = Modifier.padding(8.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
+                            Surface(
+                                modifier = Modifier.size(if (isDeepLinked) 48.dp else 36.dp),
+                                shape = CircleShape,
+                                color = markerColor,
+                                tonalElevation = if (isDeepLinked) 12.dp else 4.dp,
+                                border = BorderStroke(
+                                    if (isDeepLinked) 3.dp else 2.dp,
+                                    Color.White
+                                )
                             ) {
-                                Text(emoji, fontSize = if (isDeepLinked) 20.sp else 14.sp)
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(emoji, fontSize = if (isDeepLinked) 20.sp else 14.sp)
+                                }
                             }
                         }
                     },
@@ -275,11 +336,21 @@ fun MapScreen(
         ) {
             val filters = listOf("All", "Artists", "Events", "Workshops")
             filters.forEach { filter ->
-                KalaFilterChip(
-                    selected = filterType == filter,
-                    onClick = { mapViewModel.setFilter(filter) },
-                    label = filter
+                val scale by animateFloatAsState(
+                    targetValue = if (filterType == filter) 1.05f else 1.0f,
+                    animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+                    label = "chipScale"
                 )
+                Box(modifier = Modifier.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }) {
+                    KalaFilterChip(
+                        selected = filterType == filter,
+                        onClick = { mapViewModel.setFilter(filter) },
+                        label = filter
+                    )
+                }
             }
         }
 
@@ -292,8 +363,14 @@ fun MapScreen(
         // 🔥 Dynamic Bottom Sheet Card
         AnimatedVisibility(
             visible = selectedItem != null,
-            enter = slideInVertically(initialOffsetY = { it }),
-            exit = slideOutVertically(targetOffsetY = { it }),
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = 300f)
+            ) + fadeIn(),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = spring(dampingRatio = 0.8f, stiffness = 300f)
+            ) + fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             selectedItem?.let { item ->
@@ -437,12 +514,14 @@ fun EventMapUI(event: Event, viewModel: EventViewModel, navController: NavContro
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Full Story") }
-            KalaActionButton(
-                text = if (isRegistered) "Saved ✓" else "Join",
+            MorphingButton(
+                state = if (isRegistered) ButtonState.SUCCESS else ButtonState.IDLE,
+                idleText = "Join",
+                successText = "Saved ✓",
                 onClick = { viewModel.register(event) },
                 modifier = Modifier.weight(1f),
-                enabled = !isRegistered,
-                containerColor = if (isRegistered) Color(0xFF2E7D32) else Color(0xFFD4AF37)
+                containerColor = Color(0xFFD4AF37),
+                successColor = Color(0xFF1D9E75)
             )
         }
     }
@@ -478,12 +557,19 @@ fun WorkshopMapUI(workshop: Workshop, viewModel: WorkshopViewModel, navControlle
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Details") }
-            KalaActionButton(
-                text = if (isEnrolled) "Saved ✓" else "Enroll",
+            val isEnrolling by viewModel.isEnrolling.collectAsState()
+            MorphingButton(
+                state = when {
+                    isEnrolled -> ButtonState.SUCCESS
+                    isEnrolling -> ButtonState.LOADING
+                    else -> ButtonState.IDLE
+                },
+                idleText = "Enroll",
+                successText = "Saved ✓",
                 onClick = { viewModel.enroll(workshop) },
                 modifier = Modifier.weight(1f),
-                enabled = !isEnrolled && workshop.availableSlots > 0,
-                containerColor = if (isEnrolled) Color(0xFF2E7D32) else Color(0xFF008080)
+                containerColor = Color(0xFF008080),
+                successColor = Color(0xFF1D9E75)
             )
         }
     }

@@ -16,65 +16,53 @@ class ArtistViewModel(application: Application) : AndroidViewModel(application) 
 
     private val repository = ArtistRepository(application)
 
-    private val _selectedArtist = MutableStateFlow<Artist?>(null)
-    val selectedArtist: StateFlow<Artist?> = _selectedArtist
+    private val _artistsState = MutableStateFlow<UiState<List<Artist>>>(UiState.Loading)
+    val artistsState: StateFlow<UiState<List<Artist>>> = _artistsState
 
-    private val _artists = MutableStateFlow<List<Artist>>(emptyList())
-    val artists: StateFlow<List<Artist>> = _artists
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
-
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
+    private val _selectedArtistState = MutableStateFlow<UiState<Artist?>>(UiState.Idle)
+    val selectedArtistState: StateFlow<UiState<Artist?>> = _selectedArtistState
 
     private val _mentorshipRequestState = MutableStateFlow<UiState<Unit>>(UiState.Idle)
     val mentorshipRequestState: StateFlow<UiState<Unit>> = _mentorshipRequestState
 
     fun loadArtist(name: String) {
         viewModelScope.launch {
-            _selectedArtist.value = null // Reset state before loading new artist
-            _isLoading.value = true
-            _error.value = null
+            _selectedArtistState.value = UiState.Loading
             repository.getArtistByName(name).onSuccess { artist ->
-                _selectedArtist.value = artist
-                if (artist == null) {
-                    _error.value = "Artist not found"
+                _selectedArtistState.value = if (artist != null) {
+                    UiState.Success(artist)
+                } else {
+                    UiState.Error("Artist not found")
                 }
             }.onFailure { e ->
-                _error.value = "Failed to load artist story: ${e.message}"
+                _selectedArtistState.value = UiState.Error("Failed to load artist story: ${e.message}")
             }
-            _isLoading.value = false
         }
     }
 
     fun loadArtistById(artistId: String) {
         viewModelScope.launch {
-            _selectedArtist.value = null
-            _isLoading.value = true
-            _error.value = null
+            _selectedArtistState.value = UiState.Loading
             repository.getArtistById(artistId).onSuccess { artist ->
-                _selectedArtist.value = artist
-                if (artist == null) {
-                    _error.value = "Artist not found"
+                _selectedArtistState.value = if (artist != null) {
+                    UiState.Success(artist)
+                } else {
+                    UiState.Error("Artist not found")
                 }
             }.onFailure { e ->
-                _error.value = "Failed to load artist story: ${e.message}"
+                _selectedArtistState.value = UiState.Error("Failed to load artist story: ${e.message}")
             }
-            _isLoading.value = false
         }
     }
 
     fun fetchArtists() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
+            _artistsState.value = UiState.Loading
             repository.getArtists().onSuccess { result ->
-                _artists.value = result
+                _artistsState.value = UiState.Success(result)
             }.onFailure { e ->
-                _error.value = "Failed to load cultural map: ${e.message}"
+                _artistsState.value = UiState.Error("Failed to load cultural map: ${e.message}")
             }
-            _isLoading.value = false
         }
     }
 

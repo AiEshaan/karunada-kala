@@ -63,16 +63,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.ui.components.StaggeredItem
+import com.example.myapplication.ui.components.KalaAmbientInsight
 import java.util.Locale
 
 private const val TAG = "ExploreScreen"
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun ExploreScreen(
     navController: NavController,
     viewModel: ArtViewModel = viewModel(),
-    chatViewModel: ChatViewModel = viewModel()
+    chatViewModel: ChatViewModel = viewModel(),
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     val artList by viewModel.artForms.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -98,44 +102,25 @@ fun ExploreScreen(
     val firstItemScrollOffset by remember {
         derivedStateOf { listState.firstVisibleItemScrollOffset }
     }
-
     val firstItemIndex by remember {
         derivedStateOf { listState.firstVisibleItemIndex }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.fetchArtForms()
-    }
+    val ambientInsight by chatViewModel.ambientInsight.collectAsState()
 
-    AppBackgroundContainer(textureAlpha = 0.04f) {
-        Scaffold(
-            containerColor = Color.Transparent,
-        ) { padding ->
+    AppBackgroundContainer {
+        Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
                 state = listState,
-                contentPadding = PaddingValues(bottom = 32.dp)
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 100.dp)
             ) {
+                // 1. Animated Hero Section
                 item {
-                    val alpha by remember {
-                        derivedStateOf {
-                            if (firstItemIndex == 0) {
-                                (1f - (firstItemScrollOffset / 500f)).coerceIn(0f, 1f)
-                            } else 0f
-                        }
-                    }
-                    val translationY by remember {
-                        derivedStateOf {
-                            if (firstItemIndex == 0) {
-                                (firstItemScrollOffset * 0.3f)
-                            } else 0f
-                        }
-                    }
-
-                    Box(modifier = Modifier.graphicsLayer {
-                        this.alpha = alpha
-                        this.translationY = translationY
-                    }) {
+                    Box(modifier = Modifier
+                        .parallaxScroll(listState)
+                        .graphicsLayer(alpha = 0.95f) // Phase 4.1: Hero Glow
+                    ) {
                         HeaderSection(
                             isAiAssistantEnabled = isAiAssistantEnabled,
                             onAiAssistantToggle = { isAiAssistantEnabled = it }
@@ -143,6 +128,7 @@ fun ExploreScreen(
                     }
                 }
 
+                // 2. Search & Categories
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         SearchSection(
@@ -155,6 +141,7 @@ fun ExploreScreen(
                             onSuggestionClick = { suggestion ->
                                 viewModel.onSearchQueryChange(suggestion)
                                 viewModel.addRecentSearch(suggestion)
+                                isSearchFocused = false
                             }
                         )
 
@@ -165,14 +152,16 @@ fun ExploreScreen(
                     }
                 }
 
-                if (artList.isNotEmpty() && !isLoading) {
-                    item {
-                        RecommendedSection(
-                            artList = artList,
-                            navController = navController,
-                            onLikeToggle = { viewModel.toggleLike(it) }
-                        )
-                    }
+                // 3. Recommended Section
+                item {
+                    RecommendedSection(
+                        artList = artList,
+                        navController = navController,
+                        isLoading = isLoading,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        onLikeToggle = { viewModel.toggleLike(it) }
+                    )
                 }
 
                 // 4. Staggered Art Grid
@@ -185,17 +174,22 @@ fun ExploreScreen(
                                 viewModel.loadMoreArtForms()
                             }
                         }
-                        StaggeredAnimatedItem(index = index) {
-                            ArtCard(
-                                art = art,
-                                onNavigate = {
-                                    viewModel.addRecentSearch(art.name)
-                                    NavRoutes.navigateToDetail(navController, art)
-                                },
-                                onLikeToggle = {
-                                    viewModel.toggleLike(art.id)
-                                }
-                            )
+                        FadeInItem(delayMillis = (index % 6).let { it * 100 }) {
+                            with(sharedTransitionScope) {
+                                ArtCard(
+                                    art = art,
+                                    onNavigate = {
+                                        NavRoutes.navigateToDetail(navController, art)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    onLikeToggle = {
+                                        viewModel.toggleLike(art.id)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -204,27 +198,44 @@ fun ExploreScreen(
                     SanghaSection(onJoinClick = { navController.navigate(NavRoutes.Community.route) })
                 }
             }
-        }
 
-        Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            AnimatedVisibility(
-                visible = isAiAssistantEnabled,
-                enter = scaleIn() + fadeIn(),
-                exit = scaleOut() + fadeOut(),
-                modifier = Modifier.align(Alignment.BottomEnd)
+            // Ambient Insight Overlay
+            LoadingToContent(
+                isLoading = chatViewModel.isThinking.collectAsState().value,
+                loadingPlaceholder = { 
+                    Card(
+                        modifier = Modifier.padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f))
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Kala is thinking...", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
             ) {
-                KalaAiFab(
-                    onClick = { showChat = true }
+                KalaAmbientInsight(
+                    insight = ambientInsight,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp)
                 )
             }
-        }
 
-        if (showChat) {
-            ChatBottomSheet(
-                viewModel = chatViewModel,
-                onDismiss = { showChat = false }
-            )
+            // FAB Overlay
+            if (isAiAssistantEnabled) {
+                Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.BottomEnd) {
+                    KalaAiFab(onClick = { showChat = true })
+                }
+            }
         }
+    }
+
+    if (showChat) {
+        ChatBottomSheet(
+            viewModel = chatViewModel,
+            onDismiss = { showChat = false }
+        )
     }
 }
 
@@ -233,98 +244,49 @@ fun HeaderSection(
     isAiAssistantEnabled: Boolean,
     onAiAssistantToggle: (Boolean) -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "scrollIndicator")
-    val offset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 10f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "offset"
-    )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 40.dp)
+            .padding(top = 64.dp, bottom = 24.dp, start = 16.dp, end = 16.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(40.dp)
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.secondary)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                "HERITAGE OF KARNATAKA",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary
-            )
-        }
-
-        Text(
-            "Explore",
-            style = MaterialTheme.typography.displayLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.offset(x = (-4).dp)
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Discover the timeless arts, where tradition meets technology.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            fontStyle = FontStyle.Italic
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                "Kala AI Assistant",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Switch(
-                checked = isAiAssistantEnabled,
-                onCheckedChange = onAiAssistantToggle,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = MaterialTheme.colorScheme.primary,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+            Column {
+                Text(
+                    text = "KARUNADA",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 4.sp,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            )
+                Text(
+                    text = "KALA",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Thin,
+                    letterSpacing = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            IconButton(onClick = { onAiAssistantToggle(!isAiAssistantEnabled) }) {
+                Icon(
+                    if (isAiAssistantEnabled) Icons.Default.AutoAwesome else Icons.Default.AutoAwesomeMotion,
+                    contentDescription = null,
+                    tint = if (isAiAssistantEnabled) MaterialTheme.colorScheme.secondary else Color.Gray
+                )
+            }
         }
-
+        
         Spacer(modifier = Modifier.height(16.dp))
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth().graphicsLayer { translationY = offset }
-        ) {
-            Text(
-                "SCROLL TO UNROLL",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                letterSpacing = 1.sp
-            )
-            Icon(
-                Icons.Default.KeyboardArrowDown,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                modifier = Modifier.size(16.dp)
-            )
-        }
+        Text(
+            text = "Living heritage archives of Karnataka",
+            style = MaterialTheme.typography.bodyLarge,
+            fontStyle = FontStyle.Italic,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -332,13 +294,13 @@ fun HeaderSection(
 fun SearchSection(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    isSearchFocused: Boolean,
-    onFocusChange: (Boolean) -> Unit,
     suggestions: List<String>,
     recentSearches: List<String>,
+    isSearchFocused: Boolean,
+    onFocusChange: (Boolean) -> Unit,
     onSuggestionClick: (String) -> Unit
 ) {
-    Box {
+    Box(modifier = Modifier.fillMaxWidth().zIndex(1f)) {
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
@@ -419,10 +381,14 @@ fun CategoriesSection(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun RecommendedSection(
     artList: List<ArtForm>,
     navController: NavController,
+    isLoading: Boolean,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onLikeToggle: (String) -> Unit
 ) {
     Column(modifier = Modifier.padding(bottom = 32.dp)) {
@@ -442,69 +408,53 @@ fun RecommendedSection(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        val recommended by remember(artList) {
-            derivedStateOf {
-                artList.sortedByDescending {
-                    (if (it.isLiked) 10 else 0) + (it.viewCount / 5)
-                }.take(5)
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp)
-        ) {
-            recommended.forEach { art ->
-                Box(modifier = Modifier.width(220.dp).animateContentSize()) {
-                    ArtCard(
-                        art = art,
-                        onNavigate = {
-                            NavRoutes.navigateToDetail(navController, art)
-                        },
-                        onLikeToggle = { onLikeToggle(art.id) }
+        if (isLoading && artList.isEmpty()) {
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                repeat(3) {
+                    com.example.myapplication.ui.components.CulturalShimmer(
+                        modifier = Modifier
+                            .size(220.dp, 280.dp)
+                            .clip(RoundedCornerShape(24.dp))
                     )
                 }
             }
-        }
-    }
-}
+        } else {
+            val recommended by remember(artList) {
+                derivedStateOf {
+                    artList.sortedByDescending {
+                        (if (it.isLiked) 10 else 0) + (it.viewCount / 5)
+                    }.take(5)
+                }
+            }
 
-@Composable
-fun StaggeredAnimatedItem(index: Int, content: @Composable () -> Unit) {
-    val animatable = remember { Animatable(50f) }
-    val alpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        delay(index * 100L)
-        launch { animatable.animateTo(0f, spring(stiffness = 300f, dampingRatio = 0.8f)) }
-        launch { alpha.animateTo(1f, tween(500)) }
-    }
-    Box(modifier = Modifier.offset(y = animatable.value.dp).alpha(alpha.value)) { content() }
-}
-
-@Composable
-fun GrainOverlay() {
-    // Optimized: Use a fixed set of points and drawPoints for efficiency
-    val grainPoints = remember {
-        val points = mutableListOf<Offset>()
-        val step = 12 // Increased step for performance
-        for (x in 0..2000 step step) {
-            for (y in 0..3000 step step) {
-                if ((0..10).random() > 8) {
-                    points.add(Offset(x.toFloat(), y.toFloat()))
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp)
+            ) {
+                recommended.forEachIndexed { index, art ->
+                    StaggeredItem(index = index) {
+                        Box(modifier = Modifier.width(220.dp).animateContentSize()) {
+                            with(sharedTransitionScope) {
+                                ArtCard(
+                                    art = art,
+                                    onNavigate = {
+                                        NavRoutes.navigateToDetail(navController, art)
+                                    },
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    onLikeToggle = { onLikeToggle(art.id) }
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
-        points
-    }
-
-    Canvas(modifier = Modifier.fillMaxSize().alpha(0.08f)) {
-        drawPoints(
-            points = grainPoints,
-            pointMode = PointMode.Points,
-            color = Color.Black,
-            strokeWidth = 1f
-        )
     }
 }
 
@@ -579,119 +529,73 @@ fun KalaAiFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
 @Composable
 fun ChatBottomSheet(
     viewModel: ChatViewModel,
-    journeyViewModel: JourneyViewModel = viewModel(),
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val messages by viewModel.messages.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    var input by remember { mutableStateOf("") }
-    var isListening by remember { mutableStateOf(false) }
-
-    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
-    LaunchedEffect(Unit) {
-        tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                val result = tts?.setLanguage(Locale.ENGLISH)
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    Log.e(TAG, "Language not supported")
-                }
-            } else {
-                Log.e(TAG, "Initialization failed")
-            }
-        }
-    }
-    DisposableEffect(Unit) { onDispose { tts?.shutdown() } }
-
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        isListening = false
-        if (result.resultCode == Activity.RESULT_OK) {
-            val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.get(0) ?: ""
-            if (spokenText.isNotBlank()) {
-                viewModel.sendMessage(spokenText)
-            }
-        }
-    }
-
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) { viewModel.analyzeImage(bitmap) }
-    }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.background,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)) }
     ) {
-        Column(modifier = Modifier.fillMaxHeight(0.8f).fillMaxWidth().padding(bottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding())) {
-            Text(text = "Kala AI Assistant", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.primary)
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.primary.copy(0.1f))
+        ChatScreen(viewModel = viewModel)
+    }
+}
 
-            LazyColumn(modifier = Modifier.weight(1f).padding(horizontal = 24.dp)) {
-                items(messages) { msg ->
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = if(msg.isUser) Alignment.CenterEnd else Alignment.CenterStart) {
-                        Surface(
-                            color = if(msg.isUser) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            border = if(msg.isUser) null else BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(0.1f)),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Column {
-                                Text(msg.text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium, color = if(msg.isUser) Color.White else MaterialTheme.colorScheme.onBackground)
-                                if (!msg.isUser) {
-                                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                        IconButton(onClick = { tts?.speak(msg.text, TextToSpeech.QUEUE_FLUSH, null, "KalaSpeak") }, modifier = Modifier.size(24.dp)) {
-                                            Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
-                                        }
-                                        if (msg.text.contains("day", ignoreCase = true) || msg.text.contains("itinerary", ignoreCase = true) || msg.text.contains("plan", ignoreCase = true)) {
-                                            IconButton(onClick = { journeyViewModel.addManualEntry("AI Cultural Itinerary", "Planned by Kala") }, modifier = Modifier.size(24.dp)) {
-                                                Icon(Icons.Default.Book, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+@Composable
+fun ChatScreen(viewModel: ChatViewModel) {
+    val messages by viewModel.messages.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    var text by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            items(messages) { message ->
+                val alignment = if (message.isUser) Alignment.End else Alignment.Start
+                val color = if (message.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+                val textColor = if (message.isUser) Color.White else MaterialTheme.colorScheme.onSecondaryContainer
+
+                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
+                    Surface(
+                        color = color,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.padding(vertical = 4.dp).widthIn(max = 280.dp)
+                    ) {
+                        Text(
+                            text = message.text,
+                            modifier = Modifier.padding(12.dp),
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
                 }
-                if (isLoading) {
-                    item { Text("Kala is thinking...", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.secondary) }
+            }
+            if (isLoading) {
+                item {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp).padding(8.dp))
                 }
             }
+        }
 
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val suggestions = listOf("Cultural trip itinerary", "Tell me a legend", "Regional foods", "Nearby workshops")
-                suggestions.forEach { suggestion ->
-                    SuggestionChip(onClick = { viewModel.sendMessage(suggestion) }, label = { Text(suggestion) }, shape = RoundedCornerShape(50))
-                }
-            }
-
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
-                placeholder = { Text("Query the archives...") },
-                shape = RoundedCornerShape(12.dp),
-                leadingIcon = { IconButton(onClick = { cameraLauncher.launch(null) }) { Icon(Icons.Default.CameraAlt, contentDescription = "Heritage Vision", tint = MaterialTheme.colorScheme.secondary) } },
-                trailingIcon = {
-                    Row {
-                        IconButton(onClick = {
-                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask Kala anything...")
-                            }
-                            isListening = true
-                            speechLauncher.launch(intent)
-                        }) {
-                            val micColor by animateColorAsState(targetValue = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary, animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse), label = "micAnim")
-                            Icon(Icons.Default.Mic, contentDescription = "Voice Input", tint = if (isListening) micColor else MaterialTheme.colorScheme.secondary)
-                        }
-                        IconButton(onClick = { if(input.isNotBlank()) { viewModel.sendMessage(input); input = "" } }) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
-                    }
-                }
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Ask about our heritage...") },
+                shape = RoundedCornerShape(24.dp)
             )
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = {
+                    viewModel.sendMessage(text)
+                    text = ""
+                },
+                enabled = text.isNotBlank()
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+            }
         }
     }
 }

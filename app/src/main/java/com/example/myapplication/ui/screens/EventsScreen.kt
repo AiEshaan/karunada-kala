@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -53,7 +55,10 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
         }
     }
 
-    AppBackgroundContainer(textureAlpha = 0.04f) {
+    AppBackgroundContainer(
+        textureAlpha = 0.04f,
+        overlayBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFF8F3EA).copy(alpha = 0.5f)) // Phase 4.4: Warmer festival feel
+    ) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -80,8 +85,19 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
                     uiState = uiState,
                     onRetry = { viewModel.fetchEvents() },
                     loadingContent = {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(5) { EventCardShimmer() }
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(5) { 
+                                com.example.myapplication.ui.components.CulturalShimmer(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)
+                                        .clip(RoundedCornerShape(24.dp))
+                                )
+                            }
                         }
                     },
                     emptyContent = {
@@ -97,20 +113,7 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
                         itemsIndexed(events, key = { _, event -> event.id }) { index, event ->
-                            val shouldAnimate = index < 10
-                            var visible by remember { mutableStateOf(!shouldAnimate) }
-
-                            LaunchedEffect(event.id) {
-                                if (shouldAnimate) {
-                                    delay(index * 80L)
-                                    visible = true
-                                }
-                            }
-
-                            AnimatedVisibility(
-                                visible = visible,
-                                enter = slideInVertically { it / 2 } + fadeIn()
-                            ) {
+                            com.example.myapplication.ui.components.StaggeredItem(index = index) {
                                 EventCard(
                                     title = event.title,
                                     date = event.date,

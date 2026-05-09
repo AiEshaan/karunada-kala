@@ -32,6 +32,7 @@ import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.viewmodel.EventViewModel
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.myapplication.ui.components.AppBackgroundContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +54,9 @@ fun EventDetailScreen(
     val isRegistered = registrationStatus[title] ?: false
     val isRegistering by viewModel.isRegistering.collectAsState()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+    AppBackgroundContainer(textureAlpha = 0.03f) {
+        Scaffold(
+            containerColor = Color.Transparent,
         bottomBar = {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -245,6 +247,7 @@ fun EventDetailScreen(
                     }
                 }
             }
+        }
         }
     }
 }

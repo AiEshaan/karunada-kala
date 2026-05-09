@@ -34,19 +34,26 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.myapplication.ui.components.GyroParallaxHero
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.data.model.Artist
 import com.example.myapplication.viewmodel.ArtistViewModel
+import com.example.myapplication.ui.state.UiState
+import com.example.myapplication.ui.components.bouncyClickable
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun ArtistDetailScreen(
-    artistId: String
+    artistId: String,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     val viewModel: ArtistViewModel = viewModel()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val artist by viewModel.selectedArtist.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val artistState by viewModel.selectedArtistState.collectAsState()
+    val artist = (artistState as? UiState.Success<Artist?>)?.data
+    val isLoading = artistState is UiState.Loading
 
     LaunchedEffect(artistId) {
         viewModel.loadArtistById(artistId)
@@ -63,7 +70,7 @@ fun ArtistDetailScreen(
     ) { loading ->
         if (loading) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                com.example.myapplication.ui.components.UnrollingScrollAnimation(color = MaterialTheme.colorScheme.primary)
             }
         } else if (artist == null || artistId.isBlank()) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
@@ -104,23 +111,24 @@ fun ArtistDetailScreen(
                         }
                     ) { padding ->
 
+                        val scrollState = rememberScrollState()
                         Column(
                             modifier = Modifier
                                 .padding(padding)
-                                .verticalScroll(rememberScrollState())
+                                .verticalScroll(scrollState)
                         ) {
 
                             // 🔥 IMMERSIVE HERO
                             Box(modifier = Modifier.height(380.dp)) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(currentArtist.photoUrl)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = currentArtist.name,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                with(sharedTransitionScope) {
+                                    GyroParallaxHero(
+                                        imageUrl = currentArtist.photoUrl,
+                                        modifier = Modifier.fillMaxSize(),
+                                        scrollOffset = scrollState.value.toFloat(),
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        sharedKey = "artist_image_$artistId"
+                                    )
+                                }
 
                                 Box(
                                     modifier = Modifier
@@ -192,12 +200,8 @@ fun ArtistDetailScreen(
                             Spacer(modifier = Modifier.height(40.dp))
 
                             // 📲 CONTACT FAB-STYLE BUTTON
-                            var isPressed by remember { mutableStateOf(false) }
-                            val scale by animateFloatAsState(if (isPressed) 0.95f else 1f)
-
                             Button(
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     val url = "https://wa.me/${currentArtist.phone}"
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                     context.startActivity(intent)
@@ -206,19 +210,11 @@ fun ArtistDetailScreen(
                                     .fillMaxWidth()
                                     .padding(horizontal = 24.dp)
                                     .height(56.dp)
-                                    .graphicsLayer {
-                                        scaleX = scale
-                                        scaleY = scale
-                                    }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onPress = {
-                                                isPressed = true
-                                                tryAwaitRelease()
-                                                isPressed = false
-                                            }
-                                        )
-                                    },
+                                    .bouncyClickable(onClick = {
+                                        val url = "https://wa.me/${currentArtist.phone}"
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                        context.startActivity(intent)
+                                    }),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {

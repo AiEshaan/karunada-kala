@@ -38,12 +38,16 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import com.example.myapplication.data.model.ArtForm
 import kotlinx.coroutines.launch
+import androidx.compose.animation.*
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun ArtCard(
+fun SharedTransitionScope.ArtCard(
     art: ArtForm,
     onNavigate: () -> Unit,
-    onLikeToggle: () -> Unit = {}
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    onLikeToggle: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -70,7 +74,7 @@ fun ArtCard(
     
     PressableCard(
         onClick = onNavigate,
-        modifier = Modifier
+        modifier = modifier
             .padding(16.dp)
             .fillMaxWidth()
             .aspectRatio(0.8f)
@@ -96,7 +100,12 @@ fun ArtCard(
                                 .crossfade(true)
                                 .build(),
                             contentDescription = art.name,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .sharedElement(
+                                    rememberSharedContentState(key = "art_image_${art.id}"),
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                ),
                             contentScale = ContentScale.Crop,
                             loading = {
                                 Box(

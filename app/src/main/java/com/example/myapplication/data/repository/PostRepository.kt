@@ -12,6 +12,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -104,11 +107,11 @@ class PostRepository(private val context: Context) {
         return try {
             val snapshot = postsCollection
                 .whereEqualTo("userId", userId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .get()
                 .await()
             val posts = snapshot.toObjects(Post::class.java)
-            Result.success(posts)
+            val sortedPosts = posts.sortedByDescending { it.timestamp }
+            Result.success(sortedPosts)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -130,5 +133,21 @@ class PostRepository(private val context: Context) {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    fun observeUserPosts(userId: String): Flow<List<Post>> = callbackFlow {
+        val subscription = postsCollection
+            .whereEqualTo("userId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val posts = snapshot?.toObjects(Post::class.java) ?: emptyList()
+                // Sort locally to avoid needing a composite index in Firestore
+                val sortedPosts = posts.sortedByDescending { it.timestamp }
+                trySend(sortedPosts)
+            }
+        awaitClose { subscription.remove() }
     }
 }

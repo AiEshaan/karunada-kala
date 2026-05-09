@@ -23,8 +23,28 @@ class ChatViewModel : ViewModel() {
     private val _currentContext = MutableStateFlow("")
     private val chatHistory = mutableListOf<com.google.ai.client.generativeai.type.Content>()
     
+    private val _ambientInsight = MutableStateFlow<String?>(null)
+    val ambientInsight = _ambientInsight.asStateFlow()
+    
+    private var lastInsightContext = ""
+    
     fun setContext(context: String) {
-        _currentContext.value = context
+        if (context != _currentContext.value) {
+            _currentContext.value = context
+            if (context != lastInsightContext) {
+                generateAmbientInsight(context)
+            }
+        }
+    }
+
+    private fun generateAmbientInsight(context: String) {
+        lastInsightContext = context
+        viewModelScope.launch {
+            repository.askKala("Give me a one-sentence, fascinating, and culturally deep insight about this: $context. Keep it poetic and short (max 15 words). Start with ✨.", context, emptyList())
+                .onSuccess { insight ->
+                    _ambientInsight.value = insight
+                }
+        }
     }
 
     fun sendMessage(userText: String) {

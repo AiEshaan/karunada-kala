@@ -102,16 +102,19 @@ class JourneyViewModel(application: Application) : AndroidViewModel(application)
 
         // Observe Registrations
         eventRepository.observeUserRegistrations(userId)
+            .catch { e -> android.util.Log.e("JourneyVM", "Error observing registrations", e) }
             .onEach { _registrations.value = it }
             .launchIn(viewModelScope)
 
         // Observe Enrollments
         workshopRepository.observeUserEnrollments(userId)
+            .catch { e -> android.util.Log.e("JourneyVM", "Error observing enrollments", e) }
             .onEach { _enrollments.value = it }
             .launchIn(viewModelScope)
         
         // Observe Chronicles
         postRepository.observeUserPosts(userId)
+            .catch { e -> android.util.Log.e("JourneyVM", "Error observing posts", e) }
             .onEach { 
                 _myChronicles.value = it
                 _isLoading.value = false // Stop loading after first major data emission
