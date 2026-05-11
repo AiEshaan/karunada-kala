@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.data.local.AppDatabase
+import com.example.myapplication.core.utils.SoundManager
 
 class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -20,6 +21,7 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ArtRepository(application, database.artDao())
     private val geminiRepository = GeminiRepository()
     private val searchPrefs = SearchPrefsRepository(application)
+    private val soundManager = SoundManager(application)
 
     private val _artFormsState = MutableStateFlow<UiState<List<ArtForm>>>(UiState.Loading)
     val artFormsState: StateFlow<UiState<List<ArtForm>>> = _artFormsState
@@ -41,14 +43,23 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _viewedArts = MutableStateFlow<List<String>>(emptyList())
 
+    private val _aiRecommendations = MutableStateFlow<List<com.example.myapplication.data.model.ArtRecommendation>>(emptyList())
+    val aiRecommendations = _aiRecommendations.asStateFlow()
+
     private val _aiDescriptions = MutableStateFlow<Map<String, String>>(emptyMap())
     val aiDescriptions = _aiDescriptions.asStateFlow()
 
     private val _artLegends = MutableStateFlow<Map<String, String>>(emptyMap())
     val artLegends = _artLegends.asStateFlow()
 
+    private val _translatedDescriptions = MutableStateFlow<Map<String, String>>(emptyMap())
+    val translatedDescriptions = _translatedDescriptions.asStateFlow()
+
     private val _isGeneratingLegend = MutableStateFlow(false)
     val isGeneratingLegend = _isGeneratingLegend.asStateFlow()
+
+    private val _isGeneratingAiDescription = MutableStateFlow(false)
+    val isGeneratingAiDescription = _isGeneratingAiDescription.asStateFlow()
 
     val artOfTheDay: StateFlow<ArtForm?> = _artForms.map { list ->
         if (list.isEmpty()) return@map null
@@ -187,8 +198,19 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleLike(artId: String) {
         _artForms.update { list ->
-            list.map { if (it.id == artId) it.copy(isLiked = !it.isLiked) else it }
+            list.map { 
+                if (it.id == artId) {
+                    val newState = !it.isLiked
+                    if (newState) soundManager.playSound("success")
+                    it.copy(isLiked = newState)
+                } else it 
+            }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        soundManager.release()
     }
 
     fun addViewedArt(name: String) {
@@ -196,6 +218,14 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
             _viewedArts.update { it + name }
             viewModelScope.launch {
                 repository.incrementViewCount(name)
+                
+                // Trigger fresh AI recommendations
+                if (_viewedArts.value.size >= 1) {
+                    val allNames = _artForms.value.map { it.name }
+                    geminiRepository.generateRecommendations(_viewedArts.value, allNames).onSuccess { recs ->
+                        _aiRecommendations.value = recs
+                    }
+                }
             }
         }
     }
@@ -213,6 +243,7 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
+            _isGeneratingAiDescription.value = true
             geminiRepository.generateArtDescription(name, category).onSuccess { aiDesc ->
                 _aiDescriptions.update { it + (name to aiDesc) }
             }
@@ -220,6 +251,22 @@ class ArtViewModel(application: Application) : AndroidViewModel(application) {
             geminiRepository.generatePersonalizedLegend(name).onSuccess { legend ->
                 _artLegends.update { it + (name to legend) }
             }
+            _isGeneratingAiDescription.value = false
+        }
+    }
+
+    fun translateDescription(artName: String, text: String, targetLanguage: String) {
+        if (targetLanguage == "English") {
+            _translatedDescriptions.update { it - artName }
+            return
+        }
+
+        viewModelScope.launch {
+            _isGeneratingAiDescription.value = true
+            geminiRepository.translateContent(text, targetLanguage).onSuccess { translated ->
+                _translatedDescriptions.update { it + (artName to translated) }
+            }
+            _isGeneratingAiDescription.value = false
         }
     }
 

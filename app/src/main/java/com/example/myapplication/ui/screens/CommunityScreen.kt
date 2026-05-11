@@ -42,12 +42,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.myapplication.data.model.Post
 import com.example.myapplication.data.model.Comment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
 import com.example.myapplication.viewmodel.PostViewModel
+import com.example.myapplication.ui.theme.*
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.core.utils.TimeUtils
-import com.example.myapplication.ui.components.UiStateHandler
-import com.example.myapplication.ui.components.AppBackgroundContainer
-import com.example.myapplication.ui.components.bouncyClickable
+import com.example.myapplication.ui.components.*
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,47 +77,61 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
     }
 
     AppBackgroundContainer(
-        textureAlpha = 0.05f,
-        overlayBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFDF8F2).copy(alpha = 0.7f)) // Phase 4.5: Paper-like storytelling vibe
+        textureAlpha = 0.04f,
     ) {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                CenterAlignedTopAppBar(
+                LargeTopAppBar(
                     title = { 
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column {
                             Text(
                                 "CHRONICLES", 
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 letterSpacing = 4.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary
+                                fontWeight = FontWeight.Black,
+                                color = KarnatakaRed
                             )
                             Text(
                                 "The Living Archive",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
-                                letterSpacing = 1.sp
+                                style = MaterialTheme.typography.displaySmall,
+                                color = TempleGreen,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-1).sp
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
+                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                        titleContentColor = KarnatakaRed
+                    )
                 )
             },
             floatingActionButton = {
+                val infinite = rememberInfiniteTransition(label = "fabGlow")
+                val glowScale by infinite.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.1f,
+                    animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
+                    label = "glow"
+                )
+
                 FloatingActionButton(
-                    onClick = { 
-                        showCreateSheet = true 
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
+                    onClick = { showCreateSheet = true },
+                    containerColor = KarnatakaRed,
                     contentColor = Color.White,
                     shape = CircleShape,
-                    modifier = Modifier.padding(16.dp).bouncyClickable(
-                        onClick = { showCreateSheet = true }
-                    )
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .size(64.dp)
+                        .graphicsLayer {
+                            scaleX = glowScale
+                            scaleY = glowScale
+                        }
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Chronicle moment")
+                    Icon(Icons.Default.AddAPhoto, contentDescription = "Chronicle moment", modifier = Modifier.size(28.dp))
                 }
             }
         ) { padding ->
@@ -131,20 +146,29 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
                 contentAlignment = Alignment.TopCenter
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
+                    // Storytelling Atmosphere Layer
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(0.02f)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(KarnatakaRed, Color.Transparent)
+                                )
+                            )
+                    )
+
                     UiStateHandler(
                         uiState = uiState,
                         onRetry = { viewModel.loadPosts() },
                         emptyContent = { EmptyChroniclesState() }
-                    ) { postList ->
-                        LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Adaptive(300.dp),
-                            contentPadding = PaddingValues(12.dp),
-                            verticalItemSpacing = 12.dp,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) { postList: List<Post> ->
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = 100.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            itemsIndexed(postList, key = { _, post -> post.id }) { index, post ->
-                                FadeInItem(delayMillis = (index % 4) * 100) {
+                            items(postList, key = { it.id }) { post: Post ->
+                                FadeInItem {
                                     CulturalPostCard(post)
                                 }
                             }
@@ -154,7 +178,7 @@ fun CommunityScreen(viewModel: PostViewModel = viewModel()) {
                     if (showCreateSheet) {
                         CreatePostSheet(
                             onDismiss = { showCreateSheet = false },
-                            onPost = { uri, cap, loc ->
+                            onPost = { uri: Uri, cap: String, loc: String? ->
                                 viewModel.createPostWithImage(uri, cap, loc)
                                 showCreateSheet = false
                             },
@@ -178,130 +202,156 @@ fun CulturalPostCard(post: Post, viewModel: PostViewModel = viewModel()) {
     val haptic = LocalHapticFeedback.current
 
     PressableCard(
-        onClick = { /* Detail or expand */ },
+        onClick = { showComments = true },
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
+        KalaGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            shape = RoundedCornerShape(32.dp),
+            elevation = 8.dp,
+            alpha = 0.98f
         ) {
-        Column {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                AsyncImage(
-                    model = post.imageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // User & Date Header (Floating Glass)
-                Surface(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .align(Alignment.TopStart),
-                    color = Color.Black.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(50),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AsyncImage(
-                            model = if (post.userAvatar.isNotEmpty()) post.userAvatar else "https://ui-avatars.com/api/?name=${post.userName}",
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp).clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            post.userName.uppercase(),
-                            color = Color.White,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp
-                        )
-                    }
-                }
+            Column {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    AsyncImage(
+                        model = post.imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxWidth().height(280.dp)
+                    )
+                    
+                    // Cinematic Overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
+                                    startY = 400f
+                                )
+                            )
+                    )
 
-                // Location Badge
-                post.location?.let { loc ->
+                    // User Header (Top Floating)
                     Surface(
                         modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(16.dp),
-                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f),
+                            .padding(16.dp)
+                            .align(Alignment.TopStart),
+                        color = Color.White.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(50),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.LocationOn, null, tint = Color.White, modifier = Modifier.size(10.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(loc, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            AsyncImage(
+                                model = if (post.userAvatar.isNotEmpty()) post.userAvatar else "https://ui-avatars.com/api/?name=${post.userName}",
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp).clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                post.userName,
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Location Chip (Bottom Floating)
+                    post.location?.let { loc ->
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(16.dp),
+                            color = HeritageGold,
+                            shape = RoundedCornerShape(50),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.LocationOn, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(loc, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                            }
                         }
                     }
                 }
-            }
 
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = post.caption,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontFamily = FontFamily.Serif,
-                        fontStyle = FontStyle.Italic
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 22.sp
-                )
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = post.caption,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = FontFamily.Serif,
+                            fontStyle = FontStyle.Italic
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 24.sp
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        com.example.myapplication.ui.components.LikeButton(
-                            isLiked = isLiked,
-                            onClick = { 
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.toggleLike(post.id) 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Glass Like Button
+                            Surface(
+                                onClick = { 
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.toggleLike(post.id) 
+                                },
+                                modifier = Modifier.size(44.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f),
+                                shape = CircleShape
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        contentDescription = null,
+                                        tint = if (isLiked) KarnatakaRed else Color.Gray,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
-                        )
-                        Text(
-                            "${post.likes}", 
-                            style = MaterialTheme.typography.labelSmall, 
-                            color = Color.Gray,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
-                        
-                        Spacer(modifier = Modifier.width(16.dp))
-                        
-                        IconButton(onClick = { showComments = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Outlined.ChatBubbleOutline, null, tint = Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
-                        }
-                    }
-                    
-                    Row {
-                        IconButton(onClick = {
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, "Check out this cultural chronicle: \"${post.caption}\"")
+                            
+                            Text(
+                                "${post.likes}", 
+                                style = MaterialTheme.typography.labelLarge, 
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = 12.dp)
+                            )
+                            
+                            Spacer(modifier = Modifier.width(20.dp))
+                            
+                            IconButton(onClick = { showComments = true }) {
+                                Icon(Icons.Outlined.ChatBubbleOutline, null, tint = Color.Gray, modifier = Modifier.size(22.dp))
                             }
-                            context.startActivity(Intent.createChooser(shareIntent, "Share Chronicle"))
-                        }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Share, null, tint = Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
                         }
                         
-                        IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.MoreVert, null, tint = Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                        Row {
+                            IconButton(onClick = {
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, "Check out this cultural chronicle: \"${post.caption}\"")
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Chronicle"))
+                            }) {
+                                Icon(Icons.Default.Share, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                            }
+                            
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
@@ -437,34 +487,45 @@ fun CreatePostSheet(onDismiss: () -> Unit, onPost: (Uri, String, String?) -> Uni
         selectedImageUri = uri
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = HeritageCream,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = KarnatakaRed.copy(alpha = 0.3f)) }
+    ) {
         Column(
             modifier = Modifier
-                .padding(24.dp)
+                .padding(horizontal = 24.dp)
                 .fillMaxWidth()
-                .padding(bottom = 32.dp)
+                .padding(bottom = 40.dp)
         ) {
             Text(
-                "Chronicle a Moment",
+                "Ceremony of Archiving",
                 style = MaterialTheme.typography.headlineSmall,
                 fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = KarnatakaRed
             )
             Text(
-                "Capture the essence of our living heritage",
+                "Your contribution keeps our legacy breathing.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
+                color = TempleGreen.copy(alpha = 0.7f)
             )
             Spacer(modifier = Modifier.height(24.dp))
             
+            // Premium Dashed Upload Box
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(240.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(Color.White.copy(alpha = 0.5f))
+                    .border(
+                        BorderStroke(
+                            2.dp, 
+                            Brush.linearGradient(listOf(KarnatakaRed.copy(0.3f), HeritageGold.copy(0.3f)))
+                        ), 
+                        RoundedCornerShape(32.dp)
+                    )
                     .clickable { launcher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
@@ -473,16 +534,22 @@ fun CreatePostSheet(onDismiss: () -> Unit, onPost: (Uri, String, String?) -> Uni
                         AsyncImage(model = selectedImageUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         IconButton(
                             onClick = { selectedImageUri = null },
-                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.Black.copy(0.4f), CircleShape).size(32.dp)
+                            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).background(Color.Black.copy(0.4f), CircleShape).size(36.dp)
                         ) {
-                            Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.AddAPhoto, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("SELECT A CULTURAL MOMENT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                        Icon(Icons.Default.AutoAwesome, null, tint = HeritageGold, modifier = Modifier.size(48.dp))
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "SELECT A CULTURAL MOMENT", 
+                            style = MaterialTheme.typography.labelSmall, 
+                            color = KarnatakaRed,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
                     }
                 }
             }
@@ -495,36 +562,48 @@ fun CreatePostSheet(onDismiss: () -> Unit, onPost: (Uri, String, String?) -> Uni
                 placeholder = { Text("Unroll the story behind this moment...") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = KarnatakaRed,
+                    unfocusedBorderColor = KarnatakaRed.copy(alpha = 0.2f),
+                    focusedContainerColor = Color.White.copy(alpha = 0.6f),
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.3f)
+                )
             )
             Spacer(modifier = Modifier.height(16.dp))
             
             OutlinedTextField(
                 value = location,
                 onValueChange = { location = it },
-                placeholder = { Text("Location (e.g. Hampi, Mysore)") },
+                placeholder = { Text("Where did this occur? (e.g. Hampi)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                leadingIcon = { Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp)) }
+                shape = RoundedCornerShape(20.dp),
+                leadingIcon = { Icon(Icons.Default.LocationOn, null, tint = KarnatakaRed, modifier = Modifier.size(20.dp)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = KarnatakaRed,
+                    unfocusedBorderColor = KarnatakaRed.copy(alpha = 0.2f),
+                    focusedContainerColor = Color.White.copy(alpha = 0.6f),
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.3f)
+                )
             )
             
             Spacer(modifier = Modifier.height(32.dp))
             
             Button(
                 onClick = { if (selectedImageUri != null && caption.isNotBlank()) onPost(selectedImageUri!!, caption, location.ifBlank { null }) },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp),
+                shape = RoundedCornerShape(30.dp),
+                enabled = !isLoading && selectedImageUri != null && caption.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = KarnatakaRed)
             ) {
                 if (isLoading) {
-                    com.example.myapplication.ui.components.MorphingRing(
-                        progress = 0.7f, // Indeterminate simulation
-                        color = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
-                    Text("CHRONICLE NOW", fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+                    Icon(Icons.Default.HistoryEdu, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("CHRONICLE TO HISTORY", fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                 }
             }
         }

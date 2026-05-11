@@ -7,14 +7,26 @@ import androidx.compose.ui.graphics.Color
  * "Swiss meets Sandalwood"
  */
 
-val ArtBrand = Color(0xFF1A3C34) // Deep Forest Green / Temple Stone
-val ArtTerra = Color(0xFFBF4F26) // Terracotta / Red Soil
-val ArtClay = Color(0xFF8B4513)  // Sandalwood / Earth
-val ArtBG = Color(0xFFFDFBF7)    // Antique Paper / Cream
+// Premium Heritage Palette (Upgrade)
+val HeritageCream = Color(0xFFF7F5EF)
+val SoftParchment = Color(0xFFF2EEE3)
+val MistWhite = Color(0xFFFCFBF8)
 
-val ArtSurface = Color(0xFFFFFFFF)
-val ArtTextPrimary = Color(0xFF1A3C34)
-val ArtTextSecondary = Color(0xFF1A3C34).copy(alpha = 0.7f)
+val KarnatakaRedBrand = Color(0xFFB11226) // Deep, elegant red
+val HeritageGold = Color(0xFFD4A017)
+val TempleGreen = Color(0xFF184C3A)
+
+val SoftOlive = Color(0xFF7A8A78)
+val WarmGray = Color(0xFF6F6B64)
+val BorderSoft = Color(0xFFE6DFD2)
+
+// Legacy compatibility (re-mapped for premium feel)
+val KarnatakaYellow = HeritageGold
+val KarnatakaRed = KarnatakaRedBrand
+val ArtBG = HeritageCream
+val ArtBrand = TempleGreen
+val ArtTerra = KarnatakaRedBrand
+val ArtClay = HeritageGold
 
 // Legacy compatibility
 val Ceramic = ArtBG

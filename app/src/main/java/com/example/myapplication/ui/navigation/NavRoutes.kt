@@ -20,8 +20,12 @@ sealed class NavRoutes(val route: String) {
     object ArtistDetail : NavRoutes("artist_detail/{artistId}")
     object EventDetail : NavRoutes("event_detail/{id}/{title}/{description}/{date}/{location}/{imageUrl}/{artType}/{lat}/{lng}")
     object Notifications : NavRoutes("notifications")
+    object WorkshopRegistration : NavRoutes("workshop_registration/{workshopId}/{title}")
 
     companion object {
+        fun workshopRegistration(workshopId: String, title: String): String {
+            return "workshop_registration/${Uri.encode(workshopId)}/${Uri.encode(title)}"
+        }
         fun detail(name: String, description: String, imageUrl: String, artistId: String, category: String): String {
             return "detail/$name/$description/$imageUrl/$artistId/$category"
         }

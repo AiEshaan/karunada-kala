@@ -29,15 +29,18 @@ import com.example.myapplication.ui.components.EventCardShimmer
 import com.example.myapplication.ui.components.KalaFilterChip
 import com.example.myapplication.ui.components.UiStateHandler
 import com.example.myapplication.ui.navigation.NavRoutes
+import com.example.myapplication.ui.theme.*
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.viewmodel.EventViewModel
-import com.example.myapplication.ui.components.AppBackgroundContainer
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import com.example.myapplication.ui.components.*
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewModel()) {
-
     val uiState by viewModel.uiState.collectAsState()
     val registrationStatus by viewModel.registrationStatus.collectAsState()
     val isRegistering by viewModel.isRegistering.collectAsState()
@@ -55,79 +58,105 @@ fun EventsScreen(navController: NavController, viewModel: EventViewModel = viewM
         }
     }
 
-    AppBackgroundContainer(
-        textureAlpha = 0.04f,
-        overlayBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFF8F3EA).copy(alpha = 0.5f)) // Phase 4.4: Warmer festival feel
-    ) {
+    AppBackgroundContainer {
         Scaffold(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 LargeTopAppBar(
                     title = { 
-                        Text(
-                            "EVENTS",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 2.sp
-                        ) 
+                        Column {
+                            Text(
+                                "FESTIVALS & GATHERINGS",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = KarnatakaRed,
+                                letterSpacing = 2.sp
+                            )
+                            Text(
+                                "Experience Karnataka in motion",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = TempleGreen,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.largeTopAppBarColors(
                         containerColor = Color.Transparent,
-                        titleContentColor = MaterialTheme.colorScheme.primary
+                        scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                        titleContentColor = KarnatakaRed
                     )
                 )
             }
         ) { padding ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Festival Mood Layer (Subtle floating glow)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(0.04f)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(HeritageGold, Color.Transparent),
+                                center = Offset(200f, 400f),
+                                radius = 600f
+                            )
+                        )
+                )
 
-            Box(modifier = Modifier.padding(padding)) {
-                UiStateHandler(
-                    uiState = uiState,
-                    onRetry = { viewModel.fetchEvents() },
-                    loadingContent = {
+                Box(modifier = Modifier.padding(padding)) {
+                    UiStateHandler(
+                        uiState = uiState,
+                        onRetry = { viewModel.fetchEvents() },
+                        loadingContent = {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(5) { 
+                                    com.example.myapplication.ui.components.CulturalShimmer(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(260.dp)
+                                            .clip(RoundedCornerShape(36.dp))
+                                    )
+                                }
+                            }
+                        },
+                        emptyContent = {
+                            DefaultEmptyState(
+                                icon = "🎭",
+                                title = "No events yet",
+                                description = "Check back soon for cultural festivals!"
+                            )
+                        }
+                    ) { events ->
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            contentPadding = PaddingValues(bottom = 100.dp)
                         ) {
-                            items(5) { 
-                                com.example.myapplication.ui.components.CulturalShimmer(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(200.dp)
-                                        .clip(RoundedCornerShape(24.dp))
-                                )
-                            }
-                        }
-                    },
-                    emptyContent = {
-                        DefaultEmptyState(
-                            icon = "🎭",
-                            title = "No events yet",
-                            description = "Check back soon for cultural festivals!"
-                        )
-                    }
-                ) { events ->
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 24.dp)
-                    ) {
-                        itemsIndexed(events, key = { _, event -> event.id }) { index, event ->
-                            com.example.myapplication.ui.components.StaggeredItem(index = index) {
-                                EventCard(
-                                    title = event.title,
-                                    date = event.date,
-                                    location = event.location,
-                                    artType = event.artType,
-                                    isRegistered = registrationStatus[event.title] ?: false,
-                                    isRegistering = isRegistering,
-                                    onRegister = {
-                                        viewModel.register(event)
-                                    },
-                                    onViewOnMap = {
-                                        navController.navigate(NavRoutes.map(event.lat, event.lng))
-                                    }
-                                )
+                            itemsIndexed(events, key = { _, event -> event.id }) { index, event ->
+                                FadeInItem(delayMillis = index * 100) {
+                                    EventCard(
+                                        title = event.title,
+                                        date = event.date,
+                                        location = event.location,
+                                        artType = event.artType,
+                                        imageUrl = event.imageUrl,
+                                        isRegistered = registrationStatus[event.title] ?: false,
+                                        isRegistering = isRegistering,
+                                        onRegister = {
+                                            viewModel.register(event)
+                                        },
+                                        onViewOnMap = {
+                                            navController.navigate(NavRoutes.map(event.lat, event.lng))
+                                        },
+                                        onClick = {
+                                            NavRoutes.navigateToEventDetail(navController, event)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

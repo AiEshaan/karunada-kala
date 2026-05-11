@@ -18,13 +18,13 @@ import androidx.core.view.WindowCompat
  */
 
 private val HeritageLightColorScheme = lightColorScheme(
-    primary = ArtBrand,
-    secondary = ArtTerra,
+    primary = KarnatakaRed,
+    secondary = KarnatakaYellow,
     tertiary = ArtClay,
     background = ArtBG,
     surface = Color.White,
     onPrimary = Color.White,
-    onSecondary = Color.White,
+    onSecondary = Color.Black,
     onBackground = ArtBrand,
     onSurface = ArtBrand,
     error = ErrorCrimson

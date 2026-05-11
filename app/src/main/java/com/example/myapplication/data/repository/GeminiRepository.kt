@@ -17,7 +17,7 @@ class GeminiRepository {
 
     private val model = if (BuildConfig.GEMINI_API_KEY.isNotEmpty()) {
         GenerativeModel(
-            modelName = "gemini-1.5-flash",
+            modelName = "gemini-1.5-flash", // Reverting to flash for better compatibility and performance
             apiKey = BuildConfig.GEMINI_API_KEY
         )
     } else {
@@ -103,24 +103,27 @@ class GeminiRepository {
         return try {
             val chat = modelInstance.startChat(optimizedHistory)
             val systemPrompt = """
-            You are Kala, a friendly and wise cultural guide specialized in the heritage of Karnataka, India.
-            
-            Current App Context: $context
+            You are 'Kala', a friendly, wise, and deeply knowledgeable cultural elder of Karnataka, India. 
+            Your mission is to share the "Directory of Pride" — the soul of Karnataka — with the world.
             
             Personality:
-            - Engaging, respectful, and passionate.
-            - Useoccasional Kannada greetings like 'Namaskara'.
-            - Answer like a knowledgeable elder sharing wisdom.
+            - Respectful, engaging, and passionate about heritage.
+            - Start responses with cultural greetings like 'Namaskara!' or 'Sharanu'.
+            - Use occasional Kannada words (with English meaning) to add authenticity.
+            - Speak with the wisdom of a storyteller (Gubbi Veeranna or a Yakshagana veteran style).
             
-            Guidelines:
-            - Answer ONLY questions related to Karnataka's culture, art, history, food, and traditions.
-            - If unrelated, politely redirect the user back to Karnataka's heritage.
-            - If asked "tell me more", refer to the previous topic discussed in the history or context.
-            - Keep answers concise, formatted with bullet points if needed.
+            Context of the App: $context
+            
+            Strict Guidelines:
+            1. ONLY answer questions about Karnataka's art, culture, history, food, traditions, and artisans.
+            2. If a user asks about anything else (tech, general news, other states), politely redirect them: 
+               "Namaskara. My wisdom is rooted in the soil of Karnataka. Let us talk about our magnificent temples or the rhythm of Dollu Kunitha instead."
+            3. Keep responses immersive but concise. Use bullet points for lists.
+            4. If the user asks "Tell me more", refer back to the heritage topic being discussed.
             """
 
             val response = chat.sendMessage(content {
-                text("$systemPrompt\n\nUser: $userMessage")
+                text("$systemPrompt\n\nUser Question: $userMessage")
             })
             val text = response.text
             if (text != null) Result.success(text) else Result.failure(Exception("Kala returned null response"))
@@ -134,17 +137,18 @@ class GeminiRepository {
         val model = model ?: return Result.success("Kala Vision is offline. This image reflects our rich heritage.")
         return try {
             val prompt = """
-            You are 'Kala Vision'. Analyze this image. 
-            Identify if it shows any Karnataka cultural heritage (monuments, art forms, crafts, textiles, food).
+            You are 'Kala Vision'. Analyze this image with the eye of a cultural expert. 
+            Identify if it shows any Karnataka cultural heritage (monuments like Hampi/Belur, art forms like Yakshagana, crafts like Channapatna, textiles, or food).
             
             If it is related to Karnataka culture:
-            1. Identify it.
-            2. Explain its significance.
-            3. Mention where in Karnataka it can be found.
+            1. Identify the specific landmark, art, or tradition.
+            2. Explain its deep cultural significance and "Pride of Karnataka" value.
+            3. Mention the specific district or region where it originates.
             
-            If it is NOT related to Karnataka culture, politely say you are specialized in Karnataka's heritage and can't identify this.
+            If it is NOT related to Karnataka culture, politely say: 
+            "Namaskara. My vision is dedicated to the heritage of Karnataka. I cannot identify this, but let us talk about the wonders of our own land instead!"
             
-            Keep the response under 100 words.
+            Keep the response under 100 words, evocative and respectful.
             """
             
             val inputContent = content {
@@ -241,6 +245,22 @@ class GeminiRepository {
         } catch (e: Exception) {
             Log.e(TAG, "Error suggesting caption", e)
             Result.success("A timeless glimpse into Karnataka’s heritage.")
+        }
+    }
+
+    suspend fun translateContent(text: String, targetLanguage: String): Result<String> {
+        val modelInstance = model ?: return Result.success(text)
+        return try {
+            val prompt = """
+            Translate the following text into $targetLanguage. 
+            Maintain the respectful and cultural tone of the original text.
+            Text: $text
+            """
+            val response = modelInstance.generateContent(prompt).text
+            if (response != null) Result.success(response.trim()) else Result.failure(Exception("Translation failed"))
+        } catch (e: Exception) {
+            Log.e(TAG, "Error translating content", e)
+            Result.failure(e)
         }
     }
 }

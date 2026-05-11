@@ -8,6 +8,7 @@ import com.example.myapplication.data.model.Registration
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.data.repository.ArtRepository
 import com.example.myapplication.data.repository.EventRepository
+import com.example.myapplication.core.utils.SoundManager
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,6 +17,7 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = EventRepository(application)
     private val artRepository = ArtRepository(application)
+    private val soundManager = SoundManager(application)
     private val userId: String
         get() = FirebaseAuth.getInstance().currentUser?.uid ?: "guest_user"
 
@@ -128,6 +130,7 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
             )
             repository.registerForEvent(registration).onSuccess { ticketId ->
                 _registrationStatus.update { it + (event.title to true) }
+                soundManager.playSound("success")
                 val successMsg = "Ticket Generated: $ticketId 📜! Added to Journey."
                 _error.value = successMsg
             }.onFailure {
@@ -140,5 +143,10 @@ class EventViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() {
         _error.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        soundManager.release()
     }
 }

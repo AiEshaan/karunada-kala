@@ -9,6 +9,7 @@ import com.example.myapplication.data.model.Post
 import com.example.myapplication.data.model.Report
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.data.repository.PostRepository
+import com.example.myapplication.core.utils.SoundManager
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.*
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 class PostViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = PostRepository(application)
     private val auth = FirebaseAuth.getInstance()
+    private val soundManager = SoundManager(application)
 
     val currentUserId: String
         get() = auth.currentUser?.uid ?: "guest_user"
@@ -187,6 +189,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
             val result = repository.addPost(post)
             if (result.isSuccess) {
                 _createPostState.value = UiState.Success(Unit)
+                soundManager.playSound("SHUTTER")
                 loadPosts() // Refresh feed
             } else {
                 _createPostState.value = UiState.Error(result.exceptionOrNull()?.message ?: "Failed to chronicle moment")
@@ -196,5 +199,10 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetCreatePostState() {
         _createPostState.value = UiState.Idle
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        soundManager.release()
     }
 }

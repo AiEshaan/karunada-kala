@@ -44,6 +44,8 @@ import com.example.myapplication.ui.components.KalaActionButton
 import com.example.myapplication.ui.components.KalaFilterChip
 import com.example.myapplication.ui.model.MapItem
 import com.example.myapplication.ui.navigation.NavRoutes
+import com.example.myapplication.ui.theme.KarnatakaRed
+import com.example.myapplication.ui.theme.KarnatakaYellow
 import com.example.myapplication.viewmodel.EventViewModel
 import com.example.myapplication.viewmodel.MapViewModel
 import com.example.myapplication.ui.components.AppBackgroundContainer
@@ -68,20 +70,20 @@ fun MapScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     
-    // 🏺 Ancient Parchment Map Style
+    // 🏺 Ancient Parchment Map Style (Refined)
     val parchmentMapStyle = remember {
-        """
-        [
-          { "featureType": "all", "elementType": "labels.text.fill", "stylers": [ { "color": "#8b4513" } ] },
-          { "featureType": "landscape", "elementType": "geometry", "stylers": [ { "color": "#fdf8f0" } ] },
-          { "featureType": "poi", "stylers": [ { "visibility": "off" } ] },
-          { "featureType": "road", "elementType": "geometry", "stylers": [ { "color": "#e5dcc5" } ] },
-          { "featureType": "road", "elementType": "labels", "stylers": [ { "visibility": "off" } ] },
-          { "featureType": "transit", "stylers": [ { "visibility": "off" } ] },
-          { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#d4e6e6" } ] },
-          { "featureType": "water", "elementType": "labels.text.fill", "stylers": [ { "color": "#609393" } ] }
-        ]
-        """.trimIndent()
+        try {
+            context.resources.openRawResource(com.example.myapplication.R.raw.map_style).bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            // Fallback to minimal parchment if resource loading fails
+            """
+            [
+              { "featureType": "all", "elementType": "labels.text.fill", "stylers": [ { "color": "#8b4513" } ] },
+              { "featureType": "landscape", "elementType": "geometry", "stylers": [ { "color": "#f7e7c0" } ] },
+              { "featureType": "water", "elementType": "geometry", "stylers": [ { "color": "#9dbbb1" } ] }
+            ]
+            """.trimIndent()
+        }
     }
     val mapItems by mapViewModel.mapItems.collectAsState()
     val stableItems = remember(mapItems) { mapItems } // Removed .take(50) to allow all items
@@ -204,14 +206,14 @@ fun MapScreen(
                         val isDeepLinked = initialLat != null && item.lat == initialLat && item.lng == initialLng
                         val markerColor = when (item.type) {
                             "Artists" -> Color(0xFF8B4513)   // Warm brown
-                            "Events" -> Color(0xFFD4AF37)    // Gold
-                            "Workshops" -> Color(0xFF008080) // Teal
+                            "Events" -> KarnatakaRed         // National Pride Red
+                            "Workshops" -> KarnatakaYellow   // National Pride Yellow
                             else -> Color(0xFF6200EE)
                         }
                         val emoji = when (item.type) {
-                            "Artists" -> "🎭"
-                            "Events" -> "🎪"
-                            "Workshops" -> "🧑‍🏫"
+                            "Artists" -> "🏺"
+                            "Events" -> "🎭"
+                            "Workshops" -> "🎓"
                             else -> "📍"
                         }
 
@@ -334,10 +336,13 @@ fun MapScreen(
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
         ) {
-            val filters = listOf("All", "Artists", "Events", "Workshops")
+            val filters = listOf("All", "Artists", "Performances", "Workshops")
             filters.forEach { filter ->
+                val displayFilter = if (filter == "Performances") "Events" else filter // Map internal state
+                val isSelected = (filter == "Performances" && filterType == "Events") || (filterType == filter)
+                
                 val scale by animateFloatAsState(
-                    targetValue = if (filterType == filter) 1.05f else 1.0f,
+                    targetValue = if (isSelected) 1.05f else 1.0f,
                     animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
                     label = "chipScale"
                 )
@@ -346,8 +351,11 @@ fun MapScreen(
                     scaleY = scale
                 }) {
                     KalaFilterChip(
-                        selected = filterType == filter,
-                        onClick = { mapViewModel.setFilter(filter) },
+                        selected = isSelected,
+                        onClick = { 
+                            if (filter == "Performances") mapViewModel.setFilter("Events")
+                            else mapViewModel.setFilter(filter)
+                        },
                         label = filter
                     )
                 }
@@ -557,19 +565,11 @@ fun WorkshopMapUI(workshop: Workshop, viewModel: WorkshopViewModel, navControlle
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp)
             ) { Text("Details") }
-            val isEnrolling by viewModel.isEnrolling.collectAsState()
-            MorphingButton(
-                state = when {
-                    isEnrolled -> ButtonState.SUCCESS
-                    isEnrolling -> ButtonState.LOADING
-                    else -> ButtonState.IDLE
-                },
-                idleText = "Enroll",
-                successText = "Saved ✓",
-                onClick = { viewModel.enroll(workshop) },
+            KalaActionButton(
+                text = "Sign up",
+                onClick = { navController.navigate(NavRoutes.workshopRegistration(workshop.id, workshop.title)) },
                 modifier = Modifier.weight(1f),
-                containerColor = Color(0xFF008080),
-                successColor = Color(0xFF1D9E75)
+                containerColor = Color(0xFF008080)
             )
         }
     }

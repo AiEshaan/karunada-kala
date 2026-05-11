@@ -16,8 +16,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import com.example.myapplication.ui.theme.HeritageCream
+import com.example.myapplication.ui.theme.HeritageGold
+import com.example.myapplication.ui.theme.KarnatakaRed
 import com.example.myapplication.data.model.ArtForm
 
 @Composable
@@ -47,13 +53,41 @@ fun ArtOfTheDayCard(
         elevation = CardDefaults.cardElevation(8.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = art.imageUrl,
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(art.imageUrl.trim())
+                    .crossfade(true)
+                    .setHeader("User-Agent", "Mozilla/5.0")
+                    .build(),
                 contentDescription = art.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
-                error = painterResource(com.example.myapplication.R.drawable.placeholder)
+                loading = {
+                    CulturalShimmer(modifier = Modifier.fillMaxSize())
+                },
+                error = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        HeritageCream,
+                                        HeritageGold.copy(alpha = 0.2f),
+                                        HeritageCream
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(com.example.myapplication.R.drawable.placeholder),
+                            contentDescription = "Error loading image",
+                            tint = KarnatakaRed.copy(alpha = 0.3f),
+                            modifier = Modifier.size(60.dp)
+                        )
+                    }
+                }
             )
             
             // Gradient Overlay

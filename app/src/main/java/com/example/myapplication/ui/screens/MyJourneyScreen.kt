@@ -1,11 +1,16 @@
 package com.example.myapplication.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.HistoryEdu
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
@@ -44,9 +49,12 @@ import com.example.myapplication.data.model.Post
 import com.example.myapplication.data.model.Registration
 import com.example.myapplication.data.model.Enrollment
 import com.example.myapplication.core.utils.TimeUtils
-import com.example.myapplication.ui.components.EventCardShimmer
+import com.example.myapplication.ui.theme.*
+import com.example.myapplication.ui.components.*
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.ui.components.EventCardShimmer
+import com.example.myapplication.ui.components.PatronCertificateDialog
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +70,8 @@ fun MyJourneyScreen(
     val userAvatar by journeyViewModel.userAvatar.collectAsState()
     val badges by journeyViewModel.badges.collectAsState()
     val isLoading by journeyViewModel.isLoading.collectAsState()
+
+    var showCertificateFor by remember { mutableStateOf<String?>(null) }
     
     LaunchedEffect(Unit) {
         journeyViewModel.fetchJourney()
@@ -142,7 +152,11 @@ fun MyJourneyScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     badges.forEachIndexed { index, badge ->
-                                        BadgeItem(badge, index)
+                                        BadgeItem(badge, index) {
+                                            if (badge.isUnlocked) {
+                                                showCertificateFor = badge.name
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -211,6 +225,14 @@ fun MyJourneyScreen(
             }
         }
     }
+
+    showCertificateFor?.let { badgeName ->
+        PatronCertificateDialog(
+            userName = userName,
+            badgeName = badgeName,
+            onDismiss = { showCertificateFor = null }
+        )
+    }
 }
 
 @Composable
@@ -218,33 +240,82 @@ fun ProfileHeader(name: String, avatarUrl: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp),
+            .padding(top = 40.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(contentAlignment = Alignment.BottomEnd) {
-            AsyncImage(
-                model = if (avatarUrl.isNotEmpty()) avatarUrl else "https://ui-avatars.com/api/?name=$name&background=D4AF37&color=fff",
-                contentDescription = null,
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray),
-                contentScale = ContentScale.Crop
+        Box(contentAlignment = Alignment.Center) {
+            // Cultural Aura Ring
+            val infinite = rememberInfiniteTransition(label = "aura")
+            val auraRotation by infinite.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(tween(10000, easing = LinearEasing)),
+                label = "rotation"
             )
+
+            Box(
+                modifier = Modifier
+                    .size(130.dp)
+                    .graphicsLayer { rotationZ = auraRotation }
+                    .background(
+                        Brush.sweepGradient(
+                            listOf(KarnatakaRed, HeritageGold, TempleGreen, KarnatakaRed)
+                        ),
+                        CircleShape
+                    )
+                    .alpha(0.3f)
+            )
+
             Surface(
-                modifier = Modifier.size(32.dp),
-                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(110.dp)
+                    .padding(4.dp),
                 shape = CircleShape,
-                tonalElevation = 4.dp
+                color = Color.White,
+                tonalElevation = 8.dp
+            ) {
+                AsyncImage(
+                    model = if (avatarUrl.isNotEmpty()) avatarUrl else "https://ui-avatars.com/api/?name=$name&background=D4AF37&color=fff",
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            
+            // Achievement Glow
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(36.dp)
+                    .offset(x = (-8).dp, y = (-8).dp),
+                color = HeritageGold,
+                shape = CircleShape,
+                shadowElevation = 12.dp,
+                border = BorderStroke(2.dp, Color.White)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(18.dp))
                 }
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("CULTURAL EXPLORER", style = MaterialTheme.typography.labelSmall, color = Color.Gray, letterSpacing = 2.sp)
+        
+        Spacer(Modifier.height(20.dp))
+        Text(
+            name.uppercase(), 
+            style = MaterialTheme.typography.displaySmall, 
+            fontWeight = FontWeight.Black,
+            color = KarnatakaRed,
+            letterSpacing = 1.sp
+        )
+        Text(
+            "CULTURAL CUSTODIAN", 
+            style = MaterialTheme.typography.labelSmall, 
+            color = TempleGreen.copy(alpha = 0.7f), 
+            letterSpacing = 4.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -288,28 +359,23 @@ fun StaggeredJourneyItem(index: Int, content: @Composable () -> Unit) {
 
 @Composable
 fun StatsCard(eventCount: Int, workshopCount: Int, chronicleCount: Int) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-        elevation = CardDefaults.cardElevation(8.dp)
+        shape = RoundedCornerShape(32.dp),
+        color = Color.White.copy(alpha = 0.6f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
+        shadowElevation = 8.dp
     ) {
-        Box(modifier = Modifier.background(
-            brush = Brush.verticalGradient(
-                colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
-            )
-        )) {
-            Row(
-                modifier = Modifier
-                    .padding(vertical = 32.dp, horizontal = 16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                StatItem(count = eventCount, label = "Events", icon = "🏛")
-                StatItem(count = workshopCount, label = "Workshops", icon = "🎨")
-                StatItem(count = chronicleCount, label = "Posts", icon = "📜")
-            }
+        Row(
+            modifier = Modifier
+                .padding(vertical = 24.dp, horizontal = 16.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StatItem(count = eventCount, label = "Events", icon = "🎭")
+            StatItem(count = workshopCount, label = "Workshops", icon = "🎓")
+            StatItem(count = chronicleCount, label = "Chronicles", icon = "📜")
         }
     }
 }
@@ -317,12 +383,28 @@ fun StatsCard(eventCount: Int, workshopCount: Int, chronicleCount: Int) {
 @Composable
 fun StatItem(count: Int, label: String, icon: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(icon, fontSize = 18.sp)
+        Surface(
+            modifier = Modifier.size(40.dp),
+            color = KarnatakaRed.copy(alpha = 0.05f),
+            shape = CircleShape
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(icon, fontSize = 18.sp)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         com.example.myapplication.ui.components.CountUpText(
             targetValue = count,
-            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, color = Color.White)
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold, color = KarnatakaRed)
         )
-        Text(text = label.uppercase(), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), fontSize = 8.sp)
+        Text(
+            text = label.uppercase(), 
+            style = MaterialTheme.typography.labelSmall, 
+            color = TempleGreen.copy(alpha = 0.6f), 
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
     }
 }
 
@@ -353,12 +435,16 @@ fun TimelineJourneyItem(title: String, subtitle: String, timestamp: com.google.f
                     )
                 }
             }
-            Surface(
-                modifier = Modifier.padding(top = 12.dp).size(16.dp),
-                color = accentColor,
-                shape = CircleShape,
-                border = androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.background)
-            ) { }
+            com.example.myapplication.ui.components.PulseAnimation(
+                modifier = Modifier.padding(top = 12.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.size(16.dp),
+                    color = accentColor,
+                    shape = CircleShape,
+                    border = androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.background)
+                ) { }
+            }
         }
 
         Spacer(modifier = Modifier.width(8.dp))
@@ -457,7 +543,7 @@ fun EmptyJourneyState(onExploreClick: () -> Unit) {
 }
 
 @Composable
-fun BadgeItem(badge: com.example.myapplication.data.model.Badge, index: Int) {
+fun BadgeItem(badge: com.example.myapplication.data.model.Badge, index: Int, onClick: () -> Unit) {
     val haptic = LocalHapticFeedback.current
     var hasBursted by remember { mutableStateOf(false) }
     
@@ -482,6 +568,7 @@ fun BadgeItem(badge: com.example.myapplication.data.model.Badge, index: Int) {
                 scaleX = scale
                 scaleY = scale
             }
+            .clickable(enabled = badge.isUnlocked, onClick = onClick)
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (badge.isUnlocked) {

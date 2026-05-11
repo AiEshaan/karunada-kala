@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
@@ -39,9 +40,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -56,13 +61,19 @@ import com.example.myapplication.ui.components.ArtCardShimmer
 import com.example.myapplication.ui.components.KalaFilterChip
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.ui.state.UiState
+import com.example.myapplication.ui.components.*
+import com.example.myapplication.ui.theme.KarnatakaRed
+import com.example.myapplication.ui.theme.TempleGreen
+import com.example.myapplication.ui.theme.HeritageGold
 import com.example.myapplication.viewmodel.ArtViewModel
 import com.example.myapplication.viewmodel.ChatViewModel
 import com.example.myapplication.viewmodel.JourneyViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
+import com.example.myapplication.ui.components.AIRecommendationStrip
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.ui.components.StaggeredItem
 import com.example.myapplication.ui.components.StaggeredItem
 import com.example.myapplication.ui.components.KalaAmbientInsight
 import java.util.Locale
@@ -108,6 +119,10 @@ fun ExploreScreen(
 
     val ambientInsight by chatViewModel.ambientInsight.collectAsState()
 
+    val scrollOffset = remember { derivedStateOf { 
+        if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 500f
+    } }
+
     AppBackgroundContainer {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -118,13 +133,14 @@ fun ExploreScreen(
                 // 1. Animated Hero Section
                 item {
                     Box(modifier = Modifier
-                        .parallaxScroll(listState)
-                        .graphicsLayer(alpha = 0.95f) // Phase 4.1: Hero Glow
+                        .graphicsLayer {
+                            alpha = (1f - (scrollOffset.value / 400f)).coerceIn(0f, 1f)
+                            translationY = scrollOffset.value * 0.3f
+                            scaleX = (1f - (scrollOffset.value / 1000f)).coerceAtLeast(0.8f)
+                            scaleY = (1f - (scrollOffset.value / 1000f)).coerceAtLeast(0.8f)
+                        }
                     ) {
-                        HeaderSection(
-                            isAiAssistantEnabled = isAiAssistantEnabled,
-                            onAiAssistantToggle = { isAiAssistantEnabled = it }
-                        )
+                        ExploreHeroSection()
                     }
                 }
 
@@ -144,6 +160,8 @@ fun ExploreScreen(
                                 isSearchFocused = false
                             }
                         )
+                        
+                        Spacer(Modifier.height(8.dp))
 
                         CategoriesSection(
                             selectedCategory = selectedCategory,
@@ -162,6 +180,20 @@ fun ExploreScreen(
                         animatedVisibilityScope = animatedVisibilityScope,
                         onLikeToggle = { viewModel.toggleLike(it) }
                     )
+                }
+
+                // AI Recommendations Section
+                item {
+                    val recommendations by viewModel.aiRecommendations.collectAsState()
+                    if (recommendations.isNotEmpty()) {
+                        AIRecommendationStrip(
+                            recommendations = recommendations,
+                            onNavigate = { name ->
+                                val art = artList.find { it.name == name }
+                                if (art != null) NavRoutes.navigateToDetail(navController, art)
+                            }
+                        )
+                    }
                 }
 
                 // 4. Staggered Art Grid
@@ -240,57 +272,6 @@ fun ExploreScreen(
 }
 
 @Composable
-fun HeaderSection(
-    isAiAssistantEnabled: Boolean,
-    onAiAssistantToggle: (Boolean) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 64.dp, bottom = 24.dp, start = 16.dp, end = 16.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column {
-                Text(
-                    text = "KARUNADA",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 4.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "KALA",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Thin,
-                    letterSpacing = 12.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            
-            IconButton(onClick = { onAiAssistantToggle(!isAiAssistantEnabled) }) {
-                Icon(
-                    if (isAiAssistantEnabled) Icons.Default.AutoAwesome else Icons.Default.AutoAwesomeMotion,
-                    contentDescription = null,
-                    tint = if (isAiAssistantEnabled) MaterialTheme.colorScheme.secondary else Color.Gray
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Living heritage archives of Karnataka",
-            style = MaterialTheme.typography.bodyLarge,
-            fontStyle = FontStyle.Italic,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
 fun SearchSection(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
@@ -304,19 +285,60 @@ fun SearchSection(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
-            placeholder = { Text("Search the archives...", style = MaterialTheme.typography.bodyMedium) },
+            placeholder = { 
+                Text(
+                    "Search the archives...", 
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TempleGreen.copy(alpha = 0.5f)
+                ) 
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp)
-                .onFocusChanged { onFocusChange(it.isFocused) },
-            shape = RoundedCornerShape(24.dp),
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                .padding(vertical = 12.dp)
+                .onFocusChanged { onFocusChange(it.isFocused) }
+                .shadow(
+                    elevation = if (isSearchFocused) 24.dp else 12.dp,
+                    shape = RoundedCornerShape(28.dp),
+                    ambientColor = Color.Black.copy(alpha = 0.1f)
+                ),
+            shape = RoundedCornerShape(28.dp),
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = KarnatakaRed) },
+            trailingIcon = {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+                    val infinite = rememberInfiniteTransition(label = "micPulse")
+                    val micScale by infinite.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.2f,
+                        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse),
+                        label = "micScale"
+                    )
+                    
+                    IconButton(onClick = { /* Voice Search */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Voice Search",
+                            tint = if (searchQuery.isNotEmpty()) HeritageGold else KarnatakaRed.copy(alpha = 0.6f),
+                            modifier = if (isSearchFocused && searchQuery.isEmpty()) Modifier.graphicsLayer {
+                                scaleX = micScale
+                                scaleY = micScale
+                            } else Modifier
+                        )
+                    }
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color.Gray)
+                        }
+                    }
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                focusedContainerColor = Color.White.copy(alpha = 0.5f),
-                unfocusedContainerColor = Color.White.copy(alpha = 0.5f)
-            )
+                focusedBorderColor = KarnatakaRed.copy(alpha = 0.5f),
+                unfocusedBorderColor = Color.Transparent,
+                focusedContainerColor = Color.White.copy(alpha = 0.9f),
+                unfocusedContainerColor = Color.White.copy(alpha = 0.7f),
+                cursorColor = KarnatakaRed
+            ),
+            singleLine = true
         )
 
         if (isSearchFocused && suggestions.isNotEmpty()) {
@@ -391,22 +413,23 @@ fun RecommendedSection(
     animatedVisibilityScope: AnimatedVisibilityScope,
     onLikeToggle: (String) -> Unit
 ) {
-    Column(modifier = Modifier.padding(bottom = 32.dp)) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+    Column(modifier = Modifier.padding(vertical = 24.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
             Text(
                 "RECOMMENDED FOR YOU ✨",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.secondary,
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Bold
+                color = KarnatakaRed,
+                letterSpacing = 1.5.sp,
+                fontWeight = FontWeight.ExtraBold
             )
-            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                "Curated from Karnataka’s living heritage",
+                style = MaterialTheme.typography.bodySmall,
+                color = TempleGreen.copy(alpha = 0.6f)
+            )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         if (isLoading && artList.isEmpty()) {
             Row(
@@ -416,7 +439,7 @@ fun RecommendedSection(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 repeat(3) {
-                    com.example.myapplication.ui.components.CulturalShimmer(
+                    CulturalShimmer(
                         modifier = Modifier
                             .size(220.dp, 280.dp)
                             .clip(RoundedCornerShape(24.dp))
@@ -426,7 +449,7 @@ fun RecommendedSection(
         } else {
             val recommended by remember(artList) {
                 derivedStateOf {
-                    artList.sortedByDescending {
+                    artList.distinctBy { it.name }.sortedByDescending {
                         (if (it.isLiked) 10 else 0) + (it.viewCount / 5)
                     }.take(5)
                 }
@@ -475,52 +498,104 @@ fun SanghaSection(onJoinClick: () -> Unit) {
 
 @Composable
 fun KalaAiFab(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val density = LocalDensity.current
-    var badgeSize by remember { mutableStateOf(IntSize.Zero) }
-    val offsetX = remember { Animatable(0f) }
-    val offsetY = remember { Animatable(0f) }
-    var targetOffset by remember { mutableStateOf(Offset.Zero) }
+    val haptic = LocalHapticFeedback.current
+    val infiniteTransition = rememberInfiniteTransition(label = "fabGlow")
+    val glowScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = EaseInOutQuad),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowScale"
+    )
+    val shadowElev by infiniteTransition.animateValue(
+        initialValue = 8.dp,
+        targetValue = 24.dp,
+        typeConverter = Dp.VectorConverter,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = EaseInOutQuad),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shadowElev"
+    )
 
-    LaunchedEffect(targetOffset) {
-        coroutineScope {
-            launch { offsetX.animateTo(targetOffset.x, spring(stiffness = 300f, dampingRatio = 0.6f)) }
-            launch { offsetY.animateTo(targetOffset.y, spring(stiffness = 300f, dampingRatio = 0.6f)) }
-        }
-    }
-
-    Box(
+    Surface(
         modifier = modifier
-            .onGloballyPositioned { badgeSize = it.size }
-            .offset { IntOffset(offsetX.value.toInt(), offsetY.value.toInt()) }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val position = event.changes.first().position
-                        val centerX = badgeSize.width / 2f
-                        val centerY = badgeSize.height / 2f
-                        
-                        if (event.changes.first().pressed) {
-                            targetOffset = Offset(
-                                (position.x - centerX) * 0.4f,
-                                (position.y - centerY) * 0.4f
-                            )
-                        } else {
-                            targetOffset = Offset.Zero
-                        }
-                    }
-                }
-            }
-            .rotate(-12f)
-            .size(80.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.secondary)
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+            .size(76.dp)
+            .graphicsLayer {
+                scaleX = glowScale
+                scaleY = glowScale
+            },
+        shape = CircleShape,
+        color = Color.Transparent, // Radial gradient instead
+        shadowElevation = shadowElev,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        }
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            Text("ASK KALA", style = MaterialTheme.typography.labelLarge, color = Color.White, fontSize = 10.sp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            HeritageGold,
+                            KarnatakaRed
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Simulated AI Waveform Circles
+            repeat(3) { i ->
+                val waveScale by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.4f + (i * 0.2f),
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2000 + (i * 500), easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "wave$i"
+                )
+                val waveAlpha by infiniteTransition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(2000 + (i * 500), easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "alpha$i"
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = waveScale
+                            scaleY = waveScale
+                            alpha = waveAlpha
+                        }
+                        .background(HeritageGold, CircleShape)
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Default.AutoAwesome, 
+                    contentDescription = null, 
+                    tint = Color.White, 
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    "KALA AI", 
+                    style = MaterialTheme.typography.labelSmall, 
+                    color = Color.White, 
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp
+                )
+            }
         }
     }
 }
@@ -544,33 +619,59 @@ fun ChatBottomSheet(
 fun ChatScreen(viewModel: ChatViewModel) {
     val messages by viewModel.messages.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val suggestions by viewModel.suggestions.collectAsState()
     var text by remember { mutableStateOf("") }
+    val scrollState = rememberLazyListState()
+
+    // Auto-scroll to bottom when new messages arrive
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            scrollState.animateScrollToItem(messages.size - 1)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            state = scrollState,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             items(messages) { message ->
-                val alignment = if (message.isUser) Alignment.End else Alignment.Start
-                val color = if (message.isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
-                val textColor = if (message.isUser) Color.White else MaterialTheme.colorScheme.onSecondaryContainer
-
-                Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
-                    Surface(
-                        color = color,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.padding(vertical = 4.dp).widthIn(max = 280.dp)
-                    ) {
-                        Text(
-                            text = message.text,
-                            modifier = Modifier.padding(12.dp),
-                            color = textColor,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
+                ChatBubble(message)
             }
             if (isLoading) {
                 item {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp).padding(8.dp))
+                    KalaThinkingIndicator()
+                }
+            }
+        }
+
+        // Suggestion Chips
+        if (messages.size <= 1 && !isLoading) {
+            Text(
+                "Try asking:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                suggestions.forEach { suggestion ->
+                    SuggestionChip(
+                        onClick = { viewModel.sendMessage(suggestion) },
+                        label = { Text(suggestion, fontSize = 12.sp) },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        shape = RoundedCornerShape(16.dp)
+                    )
                 }
             }
         }
@@ -583,18 +684,132 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Ask about our heritage...") },
-                shape = RoundedCornerShape(24.dp)
+                placeholder = { Text("Ask about our heritage...", fontSize = 14.sp) },
+                shape = RoundedCornerShape(28.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                ),
+                trailingIcon = {
+                    if (text.isNotBlank()) {
+                        IconButton(onClick = { text = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
             )
             Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
+            Surface(
                 onClick = {
                     viewModel.sendMessage(text)
                     text = ""
                 },
-                enabled = text.isNotBlank()
+                enabled = text.isNotBlank() && !isLoading,
+                shape = CircleShape,
+                color = if (text.isNotBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.size(48.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = if (text.isNotBlank()) Color.White else Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatBubble(message: com.example.myapplication.data.model.ChatMessage) {
+    val alignment = if (message.isUser) Alignment.End else Alignment.Start
+    val shape = if (message.isUser) {
+        RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp)
+    } else {
+        RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp)
+    }
+    val containerColor = if (message.isUser) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    }
+    val textColor = if (message.isUser) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start
+        ) {
+            if (!message.isUser) {
+                Surface(
+                    modifier = Modifier.size(28.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("✨", fontSize = 14.sp)
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+            }
+            
+            Surface(
+                color = containerColor,
+                shape = shape,
+                modifier = Modifier.widthIn(max = 280.dp),
+                shadowElevation = 1.dp
+            ) {
+                Text(
+                    text = message.text,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun KalaThinkingIndicator() {
+    Row(
+        modifier = Modifier.padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier.size(28.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("✨", fontSize = 14.sp)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Card(
+            shape = RoundedCornerShape(20.dp, 20.dp, 20.dp, 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        ) {
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val infiniteTransition = rememberInfiniteTransition()
+                    val alphas = listOf(
+                        infiniteTransition.animateFloat(0.2f, 1f, infiniteRepeatable(tween(600, delayMillis = 0), RepeatMode.Reverse)),
+                        infiniteTransition.animateFloat(0.2f, 1f, infiniteRepeatable(tween(600, delayMillis = 200), RepeatMode.Reverse)),
+                        infiniteTransition.animateFloat(0.2f, 1f, infiniteRepeatable(tween(600, delayMillis = 400), RepeatMode.Reverse))
+                    )
+                    alphas.forEach { alpha ->
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .graphicsLayer { this.alpha = alpha.value }
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        )
+                    }
+                }
             }
         }
     }

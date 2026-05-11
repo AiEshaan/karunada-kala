@@ -18,6 +18,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.ui.components.bouncyClickable
+import com.example.myapplication.ui.theme.KarnatakaRed
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -27,18 +29,18 @@ fun OnboardingScreen(
 ) {
     val pages = listOf(
         OnboardingPage(
-            title = "Discover Karnataka’s Heritage",
-            description = "Explore the rich history and diverse art forms that define the soul of Karunada.",
+            title = "Karunada Kala",
+            description = "A Digital Directory of Pride. Explore the rich history and diverse art forms that define the soul of Karnataka.",
             icon = "🎨"
         ),
         OnboardingPage(
-            title = "Find Artists Near You",
-            description = "Connect with legendary masters and budding artists in your own neighborhood.",
+            title = "Authentic Artisans",
+            description = "Locate authentic makers and legendary masters on our interactive cultural map.",
             icon = "📍"
         ),
         OnboardingPage(
-            title = "Join the Movement",
-            description = "Enroll in workshops, attend festivals, and start your own cultural journey today.",
+            title = "Guru-Shishya Workshops",
+            description = "Enroll in workshops to learn ancient crafts and attend upcoming local performances.",
             icon = "🎭"
         )
     )
@@ -46,33 +48,49 @@ fun OnboardingScreen(
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
 
-    AppBackgroundContainer(textureAlpha = 0.05f) {
+    AppBackgroundContainer(textureAlpha = 0.04f) {
         Column(
             modifier = Modifier
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-        HorizontalPager(
+            // National Pride Badge
+            Surface(
+                color = MaterialTheme.colorScheme.secondary,
+                shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp),
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Text(
+                    "National Pride",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    color = Color.Black,
+                    letterSpacing = 1.sp
+                )
+            }
+
+            HorizontalPager(
             state = pagerState,
             modifier = Modifier.weight(1f)
         ) { page ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp),
+                    .padding(horizontal = 40.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = pages[page].icon,
-                    fontSize = 80.sp,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    fontSize = 100.sp,
+                    modifier = Modifier.padding(bottom = 32.dp)
                 )
 
                 Text(
                     text = pages[page].title,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = KarnatakaRed,
                     style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
@@ -83,10 +101,10 @@ fun OnboardingScreen(
 
                 Text(
                     text = pages[page].description,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyLarge,
-                    lineHeight = 24.sp
+                    lineHeight = 28.sp
                 )
             }
         }
@@ -96,15 +114,15 @@ fun OnboardingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 48.dp)
+                .padding(bottom = 64.dp)
         ) {
             Row(
                 horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(bottom = 32.dp)
+                modifier = Modifier.padding(bottom = 40.dp)
             ) {
                 repeat(pages.size) { index ->
-                    val color = if (pagerState.currentPage == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    val width = if (pagerState.currentPage == index) 24.dp else 8.dp
+                    val color = if (pagerState.currentPage == index) KarnatakaRed else KarnatakaRed.copy(alpha = 0.1f)
+                    val width = if (pagerState.currentPage == index) 32.dp else 8.dp
                     Box(
                         modifier = Modifier
                             .padding(horizontal = 4.dp)
@@ -127,19 +145,28 @@ fun OnboardingScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .height(56.dp),
+                    .padding(horizontal = 40.dp)
+                    .height(64.dp)
+                    .bouncyClickable(onClick = {
+                        if (pagerState.currentPage < pages.size - 1) {
+                            scope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                            }
+                        } else {
+                            onFinish()
+                        }
+                    }),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = KarnatakaRed,
+                    contentColor = Color.White
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(32.dp)
             ) {
                 Text(
-                    text = if (pagerState.currentPage == pages.size - 1) "ENTER THE SANGHA" else "NEXT",
-                    fontWeight = FontWeight.Bold,
+                    text = if (pagerState.currentPage == pages.size - 1) "ENTER THE SANGHA" else "NEXT MOMENT",
+                    fontWeight = FontWeight.Black,
                     fontSize = 14.sp,
-                    letterSpacing = 1.sp
+                    letterSpacing = 2.sp
                 )
             }
         }

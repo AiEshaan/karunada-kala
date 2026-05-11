@@ -19,14 +19,36 @@ class ChatViewModel : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
+    val isThinking = _isLoading.asStateFlow()
 
     private val _currentContext = MutableStateFlow("")
     private val chatHistory = mutableListOf<com.google.ai.client.generativeai.type.Content>()
     
     private val _ambientInsight = MutableStateFlow<String?>(null)
     val ambientInsight = _ambientInsight.asStateFlow()
+
+    private val _suggestions = MutableStateFlow(listOf(
+        "Tell me about Yakshagana 🎭",
+        "Best time to visit Hampi 🏛",
+        "Famous Karnataka food 🍲",
+        "Who built Mysore Palace? 🏰",
+        "Tell me a folk legend ✨"
+    ))
+    val suggestions = _suggestions.asStateFlow()
     
     private var lastInsightContext = ""
+
+    init {
+        // Initial greeting
+        if (_messages.value.isEmpty()) {
+            _messages.value = listOf(
+                ChatMessage(
+                    "Namaskara! I am Kala, your cultural guide to the heritage of Karnataka. How can I help you explore our 'Directory of Pride' today?",
+                    false
+                )
+            )
+        }
+    }
     
     fun setContext(context: String) {
         if (context != _currentContext.value) {

@@ -3,7 +3,9 @@ package com.example.myapplication.ui.screens
 import android.net.Uri
 import androidx.compose.animation.Animatable
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -12,12 +14,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -34,10 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.example.myapplication.data.model.Artist
 import com.example.myapplication.ui.components.*
 import com.example.myapplication.ui.navigation.NavRoutes
+import com.example.myapplication.ui.theme.*
 import com.example.myapplication.viewmodel.ArtistViewModel
 import com.example.myapplication.viewmodel.ArtViewModel
 import com.example.myapplication.viewmodel.ChatViewModel
@@ -65,6 +74,7 @@ fun DetailScreen(
     val scope = rememberCoroutineScope()
 
     val aiDescriptions by viewModel.aiDescriptions.collectAsState()
+    val translatedDescriptions by viewModel.translatedDescriptions.collectAsState()
     val artLegends by viewModel.artLegends.collectAsState()
     val artList by viewModel.artForms.collectAsState()
     val currentArt by remember(artList) { derivedStateOf { artList.find { it.name == name } } }
@@ -78,7 +88,15 @@ fun DetailScreen(
     var entered by remember { mutableStateOf(false) }
     
     // 3D Flip State
-    val rotation = remember { androidx.compose.animation.core.Animatable(0f) }
+    var isFlipped by remember { mutableStateOf(false) }
+    val flipRotation by animateFloatAsState(
+        targetValue = if (isFlipped) 180f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "flipRotation"
+    )
 
     val entranceScale by animateFloatAsState(
         targetValue = if (entered) 1f else 0.8f,
@@ -96,14 +114,13 @@ fun DetailScreen(
     }
 
     val scrollState = rememberScrollState()
-    
-    AppBackgroundContainer(
-        overlayBrush = Brush.verticalGradient(
-            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
-        )
-    ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val trimmedImageUrl = imageUrl.trim()
+
+    AppBackgroundContainer {
         Scaffold(
             containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 LargeTopAppBar(
@@ -114,7 +131,12 @@ fun DetailScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
-                    colors = TopAppBarDefaults.largeTopAppBarColors(containerColor = Color.Transparent)
+                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                        titleContentColor = KarnatakaRed,
+                        navigationIconContentColor = KarnatakaRed
+                    )
                 )
             }
         ) { padding ->
@@ -135,30 +157,25 @@ fun DetailScreen(
                             .padding(16.dp)
                             .fillMaxWidth()
                             .height(400.dp)
-                            .graphicsLayer {
-                                rotationY = rotation.value
-                                cameraDistance = 12 * density
-                            }
-                            .pointerInput(Unit) {
-                                detectTapGestures {
+                            .clickable { 
+                                isFlipped = !isFlipped
+                                scope.launch {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    scope.launch {
-                                        rotation.animateTo(
-                                            targetValue = if (rotation.value == 0f) 180f else 0f,
-                                            animationSpec = tween(600, easing = FastOutSlowInEasing)
-                                        )
-                                    }
                                 }
+                            }
+                            .graphicsLayer {
+                                rotationY = flipRotation
+                                cameraDistance = 12 * density
                             },
                         shape = RoundedCornerShape(32.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
-                            if (rotation.value <= 90f || rotation.value > 270f) {
+                            if (flipRotation <= 90f) {
                                 // FRONT SIDE
                                 with(sharedTransitionScope) {
                                     GyroParallaxHero(
-                                        imageUrl = imageUrl,
+                                        imageUrl = trimmedImageUrl,
                                         modifier = Modifier.fillMaxSize(),
                                         scrollOffset = scrollState.value.toFloat(),
                                         animatedVisibilityScope = animatedVisibilityScope,
@@ -170,15 +187,20 @@ fun DetailScreen(
                                         .matchParentSize()
                                         .background(
                                             Brush.verticalGradient(
-                                                listOf(Color.Transparent, Color.Black.copy(0.7f))
+                                                listOf(Color.Transparent, Color.Black.copy(0.85f)),
+                                                startY = 200f
                                             )
                                         )
+                                        .alpha((scrollState.value / 1000f).coerceIn(0f, 1f))
                                 )
                                 Text(
                                     text = "Tap to Reveal Legend",
-                                    color = Color.White.copy(alpha = 0.6f),
+                                    color = Color.White.copy(alpha = 0.8f),
                                     style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(16.dp)
+                                        .alpha((1f - (scrollState.value / 300f)).coerceIn(0f, 1f))
                                 )
                             } else {
                                 // Card back showing art legend
@@ -255,15 +277,31 @@ fun DetailScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            // Language Selector
+                            var selectedLanguage by remember { mutableStateOf("English") }
+                            val languages = listOf("English", "Kannada", "Hindi")
+                            
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("👁", fontSize = 14.sp)
-                                Spacer(Modifier.width(8.dp))
-                                com.example.myapplication.ui.components.CountUpText(
-                                    targetValue = viewCount,
-                                    suffix = " Views",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                languages.forEach { lang ->
+                                    val isSelected = selectedLanguage == lang
+                                    Surface(
+                                        onClick = { 
+                                            selectedLanguage = lang
+                                            viewModel.translateDescription(name, displayDescription, lang)
+                                        },
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = if (!isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)) else null
+                                    ) {
+                                        Text(
+                                            text = lang,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(Modifier.width(4.dp))
+                                }
                             }
                             
                             com.example.myapplication.ui.components.BurstSaveButton(
@@ -274,8 +312,9 @@ fun DetailScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        val finalDescription = translatedDescriptions[name] ?: displayDescription
                         Text(
-                            text = displayDescription,
+                            text = finalDescription,
                             style = MaterialTheme.typography.bodyLarge,
                             lineHeight = 26.sp,
                             color = MaterialTheme.colorScheme.onBackground
@@ -285,39 +324,64 @@ fun DetailScreen(
                     Spacer(modifier = Modifier.height(32.dp))
 
                     // 🎧 AUDIO NARRATIVE (Artisan Voice)
-                    AudioNarrativeCard(
-                        audioUrl = currentArt?.audioUrl ?: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
-                        title = name
-                    )
+                    FadeInItem(delayMillis = 300) {
+                        AudioNarrativeCard(
+                            audioUrl = currentArt?.audioUrl ?: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+                            title = name
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
                     // 🎥 VIDEO B-ROLL
-                    VideoBrollCard(videoUrl = currentArt?.videoUrl ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
+                    FadeInItem(delayMillis = 400) {
+                        VideoBrollCard(videoUrl = currentArt?.videoUrl ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
+                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
 
                     // 🌳 LEGACY TREE
-                    LegacyTree(
-                        guru = selectedArtist?.guruName ?: "Traditional Master",
-                        artist = selectedArtist?.name ?: "Current Custodian",
-                        students = selectedArtist?.studentsDescription ?: "Dedicated Apprentices"
-                    )
+                    FadeInItem(delayMillis = 500) {
+                        LegacyTree(
+                            guru = selectedArtist?.guruName ?: "Traditional Master",
+                            artist = selectedArtist?.name ?: "Current Custodian",
+                            students = selectedArtist?.studentsDescription ?: "Dedicated Apprentices"
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(48.dp))
 
                     // 🎓 MENTORSHIP CALL TO ACTION
-                    MentorshipCTA(artistName = selectedArtist?.name ?: "the Master")
+                    MentorshipCTA(
+                        artistName = selectedArtist?.name ?: "the Master",
+                        onRequestClick = {
+                            if (category == "Workshop") {
+                                // Navigate to specific workshop registration
+                                navController.navigate(NavRoutes.workshopRegistration(artistId, name))
+                            } else {
+                                // Generic interest registration for the art form
+                                navController.navigate(NavRoutes.workshopRegistration("art_$name", "Learn $name"))
+                            }
+                        }
+                    )
 
                     Spacer(modifier = Modifier.height(48.dp))
 
                     // 🎭 RELATED ARTS (Staggered)
-                    RelatedArtsSection(
-                        category = category,
-                        currentArtName = name,
-                        viewModel = viewModel,
-                        navController = navController
-                    )
+                    FadeInItem(delayMillis = 600) {
+                        MarketplaceSection(name)
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    FadeInItem(delayMillis = 700) {
+                        RelatedArtsSection(
+                            category = category,
+                            currentArtName = name,
+                            viewModel = viewModel,
+                            navController = navController
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(64.dp))
                 }
@@ -343,11 +407,21 @@ fun CustodianSection(artist: Artist, onClick: () -> Unit) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = artist.photoUrl,
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(artist.photoUrl)
+                    .crossfade(true)
+                    .setHeader("User-Agent", "Mozilla/5.0")
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier.size(64.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                loading = { CulturalShimmer(modifier = Modifier.fillMaxSize()) },
+                error = { 
+                    Box(Modifier.fillMaxSize().background(HeritageGold.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                        Text("👤", fontSize = 24.sp)
+                    }
+                }
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column {
@@ -361,7 +435,7 @@ fun CustodianSection(artist: Artist, onClick: () -> Unit) {
 }
 
 @Composable
-fun MentorshipCTA(artistName: String) {
+fun MentorshipCTA(artistName: String, onRequestClick: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.secondary,
         shape = RoundedCornerShape(24.dp),
@@ -373,11 +447,66 @@ fun MentorshipCTA(artistName: String) {
             Text("Learn the secrets of this craft directly from $artistName.", textAlign = TextAlign.Center, color = Color.White.copy(alpha = 0.8f))
             Spacer(modifier = Modifier.height(24.dp))
             Button(
-                onClick = { /* Handle request */ },
+                onClick = onRequestClick,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("SEND REQUEST")
+            }
+        }
+    }
+}
+
+@Composable
+fun MarketplaceSection(artName: String) {
+    val products = listOf(
+        "Premium $artName Masterpiece" to "₹4,500",
+        "Handcrafted $artName Small" to "₹1,200",
+        "Collector's $artName Edition" to "₹8,999"
+    )
+
+    Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Authentic Collection 🛍️", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Buy Authentic", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            products.forEach { (title, price) ->
+                Card(
+                    modifier = Modifier.width(200.dp).padding(end = 16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            Text("📦", fontSize = 40.sp, modifier = Modifier.align(Alignment.Center))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(price, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                            IconButton(onClick = {}, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -409,11 +538,28 @@ fun RelatedArtsSection(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column {
-                                AsyncImage(
-                                    model = art.imageUrl,
+                                SubcomposeAsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(art.imageUrl.trim())
+                                        .crossfade(true)
+                                        .setHeader("User-Agent", "Mozilla/5.0")
+                                        .build(),
                                     contentDescription = null,
                                     modifier = Modifier.height(120.dp).fillMaxWidth(),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Crop,
+                                    loading = { CulturalShimmer(modifier = Modifier.fillMaxSize()) },
+                                    error = {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().background(HeritageGold.copy(alpha = 0.1f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                painterResource(com.example.myapplication.R.drawable.placeholder),
+                                                null,
+                                                tint = KarnatakaRed.copy(0.2f)
+                                            )
+                                        }
+                                    }
                                 )
                                 Text(art.name, modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
                             }

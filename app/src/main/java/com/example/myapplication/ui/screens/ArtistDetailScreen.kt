@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +40,7 @@ import com.example.myapplication.ui.components.GyroParallaxHero
 import com.example.myapplication.ui.components.AppBackgroundContainer
 import com.example.myapplication.data.model.Artist
 import com.example.myapplication.viewmodel.ArtistViewModel
+import com.example.myapplication.ui.theme.*
 import com.example.myapplication.ui.state.UiState
 import com.example.myapplication.ui.components.bouncyClickable
 
@@ -95,7 +98,13 @@ fun ArtistDetailScreen(
                             LargeTopAppBar(
                                 title = { Text(currentArtist.name, style = MaterialTheme.typography.headlineMedium) },
                                 scrollBehavior = scrollBehavior,
-                                colors = TopAppBarDefaults.largeTopAppBarColors(containerColor = Color.Transparent),
+                                colors = TopAppBarDefaults.largeTopAppBarColors(
+                                    containerColor = Color.Transparent,
+                                    scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                                    titleContentColor = KarnatakaRed,
+                                    navigationIconContentColor = KarnatakaRed,
+                                    actionIconContentColor = KarnatakaRed
+                                ),
                                 actions = {
                                     IconButton(onClick = {
                                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -199,26 +208,47 @@ fun ArtistDetailScreen(
 
                             Spacer(modifier = Modifier.height(40.dp))
 
-                            // 📲 CONTACT FAB-STYLE BUTTON
-                            Button(
-                                onClick = {
-                                    val url = "https://wa.me/${currentArtist.phone}"
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                    context.startActivity(intent)
-                                },
+                            // 📲 CONTACT SECTION
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 24.dp)
-                                    .height(56.dp)
-                                    .bouncyClickable(onClick = {
+                                    .padding(horizontal = 24.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // WhatsApp / Message
+                                Button(
+                                    onClick = {
                                         val url = "https://wa.me/${currentArtist.phone}"
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                         context.startActivity(intent)
-                                    }),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Text("Namaskara, Contact Artist", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                                ) {
+                                    Icon(Icons.Default.Chat, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Message", fontWeight = FontWeight.Bold)
+                                }
+
+                                // Tap to Call (Requirement)
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${currentArtist.phone}"))
+                                        context.startActivity(intent)
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Icon(Icons.Default.Call, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Call Artist", fontWeight = FontWeight.Bold)
+                                }
                             }
                             
                             Spacer(modifier = Modifier.height(48.dp))

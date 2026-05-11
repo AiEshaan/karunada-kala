@@ -27,11 +27,28 @@ import androidx.media3.exoplayer.ExoPlayer
 @OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun AudioNarrativeCard(audioUrl: String, title: String) {
+    if (audioUrl.isBlank()) {
+        // Safe placeholder when no URL is provided
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var isReady by remember { mutableStateOf(false) }
+    var hasError by remember { mutableStateOf(false) }
     
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
+            addListener(object : androidx.media3.common.Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == androidx.media3.common.Player.STATE_READY) {
+                        isReady = true
+                    }
+                }
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    hasError = true
+                }
+            })
             val mediaItem = MediaItem.fromUri(audioUrl)
             setMediaItem(mediaItem)
             prepare()
@@ -66,40 +83,58 @@ fun AudioNarrativeCard(audioUrl: String, title: String) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = {
-                    if (isPlaying) exoPlayer.pause() else exoPlayer.play()
-                    isPlaying = !isPlaying
-                },
+            Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .background(
+                        if (hasError) Color.Gray else MaterialTheme.colorScheme.primary, 
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
+                if (!isReady && !hasError) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    IconButton(
+                        onClick = {
+                            if (!hasError) {
+                                if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                isPlaying = !isPlaying
+                            }
+                        },
+                        enabled = isReady && !hasError
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
             }
             
             Spacer(Modifier.width(16.dp))
             
             Column {
                 Text(
-                    text = "Artisan Voice",
+                    text = if (hasError) "Audio Unavailable" else "Artisan Voice",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (hasError) Color.Gray else MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "Hear about $title",
+                    text = if (hasError) "Unable to load story" else "Hear about $title",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    text = "A short narrative from the master custodian",
+                    text = if (hasError) "Please check your connection" else "A short narrative from the master custodian",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

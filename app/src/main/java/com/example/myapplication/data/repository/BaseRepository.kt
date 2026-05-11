@@ -46,8 +46,14 @@ abstract class BaseRepository(context: Context? = null) {
 
         // 3. Collect from Firestore, emit, and update cache
         firestoreFlow.collect { objects ->
-            emit(objects)
-            cache?.saveCollection(collectionName, objects)
+            // Only update if we actually got results from network. 
+            // Avoid clearing local cache if network returns empty due to error/offline state.
+            if (objects.isNotEmpty()) {
+                emit(objects)
+                cache?.saveCollection(collectionName, objects)
+            } else {
+                Log.d(tag, "Network returned empty for $collectionName, preserving cache.")
+            }
         }
     }
 }

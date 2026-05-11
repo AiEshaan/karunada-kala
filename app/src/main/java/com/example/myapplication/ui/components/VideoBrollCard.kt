@@ -28,11 +28,28 @@ import androidx.media3.ui.PlayerView
 @OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun VideoBrollCard(videoUrl: String) {
+    if (videoUrl.isBlank()) {
+        // Safe guard for empty URLs
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    var isReady by remember { mutableStateOf(false) }
+    var hasError by remember { mutableStateOf(false) }
 
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
+            addListener(object : androidx.media3.common.Player.Listener {
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == androidx.media3.common.Player.STATE_READY) {
+                        isReady = true
+                    }
+                }
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    hasError = true
+                }
+            })
             setMediaItem(MediaItem.fromUri(videoUrl))
             prepare()
         }
@@ -79,28 +96,38 @@ fun VideoBrollCard(videoUrl: String) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .clickable { 
+                        .background(if (hasError) Color.DarkGray else Color.Black.copy(alpha = 0.4f))
+                        .clickable(enabled = isReady && !hasError) { 
                             exoPlayer.play()
                             isPlaying = true
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(64.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(32.dp).padding(start = 4.dp)
-                            )
+                    if (!isReady && !hasError) {
+                        CircularProgressIndicator(color = Color.White)
+                    } else if (hasError) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(48.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("Video Unavailable", color = Color.White, style = MaterialTheme.typography.labelLarge)
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text("Watch the Process", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(32.dp).padding(start = 4.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Watch the Process", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }

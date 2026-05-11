@@ -12,7 +12,7 @@ import com.valentinilk.shimmer.shimmer
 
 @Composable
 fun ArtCardShimmer() {
-    KalaShimmer(
+    CulturalShimmer(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .fillMaxWidth()

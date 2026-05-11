@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -36,6 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.ui.theme.KarnatakaRed
+import com.example.myapplication.ui.theme.TempleGreen
+import com.example.myapplication.ui.theme.HeritageCream
+import com.example.myapplication.ui.theme.HeritageGold
 import com.example.myapplication.ui.state.UiState
 
 /**
@@ -73,19 +78,19 @@ fun KalaBackground(
 }
 
 /**
- * 🥇 9. SHIMMER LOADING (Premium feel)
+ * 🥇 9. SHIMMER LOADING (Premium Heritage feel)
  */
 @Composable
-fun KalaShimmer(
+fun CulturalShimmer(
     modifier: Modifier = Modifier,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp)
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(24.dp)
 ) {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val alpha by transition.animateFloat(
         initialValue = 0.3f,
-        targetValue = 0.7f,
+        targetValue = 0.6f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800),
+            animation = tween(1200, easing = EaseInOutQuad),
             repeatMode = RepeatMode.Reverse
         ),
         label = "shimmerAlpha"
@@ -93,7 +98,16 @@ fun KalaShimmer(
 
     Box(
         modifier = modifier
-            .background(Color.Gray.copy(alpha = alpha), shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        HeritageCream.copy(alpha = alpha),
+                        HeritageGold.copy(alpha = alpha * 0.5f),
+                        HeritageCream.copy(alpha = alpha)
+                    )
+                ), 
+                shape
+            )
     )
 }
 
@@ -265,6 +279,10 @@ fun Modifier.parallaxScroll(scrollState: ScrollState, factor: Float = 0.5f) = gr
     translationY = scrollState.value * factor
 }
 
+fun Modifier.parallaxScroll(lazyListState: LazyListState, factor: Float = 0.5f) = graphicsLayer {
+    translationY = lazyListState.firstVisibleItemScrollOffset * factor
+}
+
 /**
  * Micro-interaction: Scale down on press
  */
@@ -305,27 +323,56 @@ fun KalaFilterChip(
     icon: String? = null
 ) {
     val haptic = LocalHapticFeedback.current
-    FilterChip(
-        selected = selected,
+    
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) KarnatakaRed else Color.White.copy(alpha = 0.7f),
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "chipBackground"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) Color.White else TempleGreen.copy(alpha = 0.8f),
+        label = "chipContent"
+    )
+    val elevation by animateDpAsState(
+        targetValue = if (selected) 12.dp else 2.dp,
+        label = "chipElevation"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.05f else 1.0f,
+        label = "chipScale"
+    )
+
+    Surface(
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
-        label = {
+        selected = selected,
+        modifier = modifier
+            .padding(end = 12.dp, bottom = 8.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
+        shape = RoundedCornerShape(50),
+        color = backgroundColor,
+        contentColor = contentColor,
+        shadowElevation = elevation
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Text(text = icon, modifier = Modifier.padding(end = 8.dp))
+            }
             Text(
-                text = if (icon != null) "$icon $label" else label,
-                style = MaterialTheme.typography.labelLarge
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
             )
-        },
-        modifier = modifier.padding(end = 8.dp).bounceClick(),
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = MaterialTheme.colorScheme.primary,
-            selectedLabelColor = Color.White,
-            labelColor = MaterialTheme.colorScheme.primary
-        ),
-        shape = RoundedCornerShape(24.dp),
-        border = null
-    )
+        }
+    }
 }
 
 @Composable
@@ -414,21 +461,32 @@ fun DefaultEmptyState(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
+            modifier = Modifier.padding(40.dp)
         ) {
-            Text(icon, fontSize = 64.sp)
-            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                modifier = Modifier.size(140.dp),
+                color = HeritageGold.copy(alpha = 0.05f),
+                shape = CircleShape
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(icon, fontSize = 72.sp)
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
             Text(
                 title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                color = KarnatakaRed
             )
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 description,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = TempleGreen.copy(alpha = 0.6f),
+                lineHeight = 24.sp
             )
         }
     }
@@ -440,29 +498,42 @@ fun ErrorState(message: String, onRetry: () -> Unit) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
+        Card(
+            shape = RoundedCornerShape(32.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+            modifier = Modifier.padding(32.dp),
+            elevation = CardDefaults.cardElevation(12.dp)
         ) {
-            Text("⚠️", fontSize = 64.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "Something went wrong",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                message,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onRetry) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Retry")
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(32.dp)
+            ) {
+                Text("⚠️", fontSize = 64.sp)
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    "Unable to unroll the story",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    color = KarnatakaRed
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    message.ifBlank { "Please check your connection and unroll the story again." },
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = onRetry,
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = KarnatakaRed)
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("RETRY ARCHIVE", fontWeight = FontWeight.Black)
+                }
             }
         }
     }

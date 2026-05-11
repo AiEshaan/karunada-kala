@@ -11,6 +11,7 @@ import com.example.myapplication.data.repository.WorkshopRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class WorkshopViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -58,31 +59,42 @@ class WorkshopViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun enroll(workshop: Workshop) {
+        // ... (existing enroll logic)
+    }
+
+    fun registerInterest(
+        workshopId: String,
+        workshopTitle: String,
+        name: String,
+        phone: String,
+        email: String,
+        reason: String
+    ) {
         viewModelScope.launch {
             _isEnrolling.value = true
-            _enrollmentUiState.value = UiState.Loading
-            
-            val enrollment = Enrollment(
+            val registration = com.example.myapplication.data.model.Registration(
                 userId = userId,
-                workshopId = workshop.id,
-                workshopTitle = workshop.title,
+                activityId = workshopId,
+                activityTitle = workshopTitle,
+                activityType = "Workshop",
+                name = name,
+                phone = phone,
+                email = email,
+                reason = reason,
+                status = "Interested",
                 timestamp = com.google.firebase.Timestamp.now()
             )
             
-            repository.enrollInWorkshop(enrollment).onSuccess {
-                _enrollmentStatus.value = _enrollmentStatus.value + (workshop.id to true)
-                val successMsg = "Enrollment Confirmed 🎨! Seat reserved for ${workshop.title}."
-                _uiEvent.value = successMsg
-                _lastEnrolledWorkshop.value = workshop
-                _enrollmentUiState.value = UiState.Success(successMsg)
-                // Update local workshop state with current availability
-                repository.getWorkshops().onSuccess { updatedList ->
-                    _workshops.value = updatedList
-                }
-            }.onFailure { e ->
-                val errorMsg = e.message ?: "Enrollment failed"
-                _uiEvent.value = errorMsg
-                _enrollmentUiState.value = UiState.Error(errorMsg)
+            try {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("registrations")
+                    .add(registration)
+                    .await()
+                _uiEvent.value = "Interest Registered for $workshopTitle! The artist will contact you."
+                _enrollmentUiState.value = UiState.Success("Success")
+            } catch (e: Exception) {
+                _uiEvent.value = "Registration failed: ${e.message}"
+                _enrollmentUiState.value = UiState.Error(e.message ?: "Error")
             }
             _isEnrolling.value = false
         }

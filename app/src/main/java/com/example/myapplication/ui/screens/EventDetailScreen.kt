@@ -33,6 +33,9 @@ import com.example.myapplication.viewmodel.EventViewModel
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +56,7 @@ fun EventDetailScreen(
     val registrationStatus by viewModel.registrationStatus.collectAsState()
     val isRegistered = registrationStatus[title] ?: false
     val isRegistering by viewModel.isRegistering.collectAsState()
+    val trimmedImageUrl = imageUrl.trim()
 
     AppBackgroundContainer(textureAlpha = 0.03f) {
         Scaffold(
@@ -87,8 +91,19 @@ fun EventDetailScreen(
 
                     Button(
                         onClick = {
-                            // Use a dummy event object for registration since we only need title and id
-                            viewModel.register(com.example.myapplication.data.model.Event(id = id, title = title))
+                            viewModel.register(
+                                com.example.myapplication.data.model.Event(
+                                    id = id,
+                                    title = title,
+                                    artType = artType,
+                                    date = date,
+                                    location = location,
+                                    imageUrl = imageUrl,
+                                    description = description,
+                                    lat = lat,
+                                    lng = lng
+                                )
+                            )
                         },
                         modifier = Modifier.weight(2f).height(56.dp),
                         shape = RoundedCornerShape(16.dp),
@@ -118,7 +133,7 @@ fun EventDetailScreen(
             // Hero Image
             Box(modifier = Modifier.fillMaxWidth().height(350.dp)) {
                 AsyncImage(
-                    model = imageUrl,
+                    model = trimmedImageUrl,
                     contentDescription = title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
@@ -212,38 +227,36 @@ fun EventDetailScreen(
                 Text("Location", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(16.dp))
                 
-                // Embedded Map Placeholder (Since we don't have a mini map component yet, we navigate to the main map)
+                // Interactive Mini-Map
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    onClick = { navController.navigate(NavRoutes.map(lat, lng)) }
+                        .height(200.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        // Get API Key from Manifest metadata
-                        val appInfo = context.packageManager.getApplicationInfo(context.packageName, android.content.pm.PackageManager.GET_META_DATA)
-                        val mapsKey = appInfo.metaData.getString("com.google.android.geo.API_KEY") ?: ""
-                        
-                        AsyncImage(
-                            model = "https://maps.googleapis.com/maps/api/staticmap?center=$lat,$lng&zoom=15&size=600x300&markers=color:red%7C$lat,$lng&key=$mapsKey",
-                            contentDescription = "Map Preview",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
-                            error = painterResource(com.example.myapplication.R.drawable.placeholder)
+                    val eventLocation = LatLng(lat, lng)
+                    val miniMapCamera = rememberCameraPositionState {
+                        position = CameraPosition.fromLatLngZoom(eventLocation, 13f)
+                    }
+                    
+                    GoogleMap(
+                        modifier = Modifier.fillMaxSize(),
+                        cameraPositionState = miniMapCamera,
+                        uiSettings = MapUiSettings(
+                            zoomControlsEnabled = false,
+                            scrollGesturesEnabled = false,
+                            zoomGesturesEnabled = false,
+                            tiltGesturesEnabled = false,
+                            rotationGesturesEnabled = false
+                        ),
+                        onMapClick = { navController.navigate(NavRoutes.map(lat, lng)) }
+                    ) {
+                        val markerState = rememberMarkerState(position = eventLocation)
+                        Marker(
+                            state = markerState,
+                            title = title
                         )
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(24.dp)
-                        ) {
-                            Text(
-                                "View on Interactive Map",
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelLarge
-                            )
-                        }
                     }
                 }
             }

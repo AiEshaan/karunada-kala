@@ -16,6 +16,7 @@ class CacheRepository(private val context: Context) {
     private val gson = Gson()
 
     suspend fun <T> saveCollection(key: String, data: List<T>) {
+        if (data.isEmpty()) return
         val json = gson.toJson(data)
         context.dataStore.edit { preferences ->
             preferences[stringPreferencesKey(key)] = json

@@ -12,10 +12,6 @@ android {
     namespace = "com.example.myapplication"
     compileSdk = 36
 
-    kotlin {
-        jvmToolchain(21)
-    }
-
     defaultConfig {
         applicationId = "com.example.myapplication"
         minSdk = 24

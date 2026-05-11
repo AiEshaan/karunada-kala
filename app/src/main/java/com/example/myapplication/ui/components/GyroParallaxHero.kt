@@ -15,7 +15,27 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import com.example.myapplication.ui.theme.HeritageCream
+import com.example.myapplication.ui.theme.HeritageGold
+import com.example.myapplication.ui.theme.KarnatakaRed
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * 🌀 GyroParallaxHero
@@ -61,8 +81,14 @@ fun SharedTransitionScope.GyroParallaxHero(
     val animX by animateFloatAsState(tiltX, spring(0.6f, 200f), label = "gyroX")
     val animY by animateFloatAsState(tiltY, spring(0.6f, 200f), label = "gyroY")
 
-    AsyncImage(
-        model = imageUrl,
+    val trimmedImageUrl = imageUrl.trim()
+
+    SubcomposeAsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(trimmedImageUrl)
+            .crossfade(true)
+            .setHeader("User-Agent", "Mozilla/5.0")
+            .build(),
         contentDescription = null,
         modifier = if (sharedKey != null) {
             modifier
@@ -84,6 +110,43 @@ fun SharedTransitionScope.GyroParallaxHero(
                 scaleY = 1.15f
             }
         },
-        contentScale = ContentScale.Crop
+        contentScale = ContentScale.Crop,
+        loading = {
+            CulturalShimmer(modifier = Modifier.fillMaxSize())
+        },
+        error = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                HeritageCream,
+                                HeritageGold.copy(alpha = 0.2f),
+                                HeritageCream
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        painter = painterResource(com.example.myapplication.R.drawable.placeholder),
+                        contentDescription = "Error loading image",
+                        tint = KarnatakaRed.copy(alpha = 0.3f),
+                        modifier = Modifier.size(80.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "CULTURAL ARCHIVE OFFLINE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = KarnatakaRed.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                }
+            }
+        }
     )
 }

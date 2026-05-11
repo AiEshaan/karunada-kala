@@ -9,7 +9,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +32,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
+import com.example.myapplication.ui.theme.KarnatakaRed
+import com.example.myapplication.ui.theme.HeritageGold
+import com.example.myapplication.ui.theme.HeritageCream
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 
 @Composable
 fun EventCard(
@@ -49,40 +59,85 @@ fun EventCard(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         KalaGlassCard(
             modifier = Modifier.fillMaxWidth(),
-            elevation = KalaElevation.Medium,
-            alpha = 0.85f
+            elevation = 12.dp,
+            shape = RoundedCornerShape(36.dp),
+            alpha = 0.95f
         ) {
             Column {
                 if (imageUrl.isNotBlank()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
-                        AsyncImage(
-                            model = imageUrl,
+                    Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
+                        SubcomposeAsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(imageUrl.trim())
+                                .crossfade(true)
+                                .setHeader("User-Agent", "Mozilla/5.0")
+                                .build(),
                             contentDescription = title,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
-                            placeholder = painterResource(com.example.myapplication.R.drawable.placeholder),
-                            error = painterResource(com.example.myapplication.R.drawable.placeholder)
+                            loading = {
+                                CulturalShimmer(modifier = Modifier.fillMaxSize())
+                            },
+                            error = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.linearGradient(
+                                                colors = listOf(
+                                                    HeritageCream,
+                                                    HeritageGold.copy(alpha = 0.2f),
+                                                    HeritageCream
+                                                )
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(com.example.myapplication.R.drawable.placeholder),
+                                        contentDescription = "Error loading image",
+                                        tint = KarnatakaRed.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                }
+                            }
                         )
                         
-                        // Urgency Badge
-                        com.example.myapplication.ui.components.PulseAnimation(
-                            modifier = Modifier.padding(12.dp).align(Alignment.TopStart)
+                        // Premium Glass Date Badge
+                        Surface(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .align(Alignment.TopEnd),
+                            color = Color.White.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
                         ) {
-                            Surface(
-                                color = Color.Black.copy(alpha = 0.6f),
-                                shape = RoundedCornerShape(8.dp)
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(
-                                    text = "🔥 Filling Fast",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                val dateParts = date.split(" ").filter { it.isNotBlank() }
+                                if (dateParts.size >= 2) {
+                                    Text(
+                                        text = dateParts[0].uppercase(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        text = dateParts[1],
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                } else {
+                                    Text(date, style = MaterialTheme.typography.labelSmall, color = Color.White)
+                                }
                             }
                         }
 
@@ -91,7 +146,7 @@ fun EventCard(
                                 .fillMaxSize()
                                 .background(
                                     Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f)),
+                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
                                         startY = 100f
                                     )
                                 )
@@ -99,18 +154,28 @@ fun EventCard(
                     }
                 }
                 
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(24.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Top
                     ) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = artType.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = HeritageGold,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 30.sp
+                            )
+                        }
                         
                         Row {
                             IconButton(onClick = {
@@ -119,48 +184,8 @@ fun EventCard(
                                     putExtra(Intent.EXTRA_TEXT, "Join me for $title, a $artType event in Karnataka! Discover more on Karunada Kala.")
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, "Share Event"))
-                            }) {
-                                Icon(Icons.Default.Share, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                            }
-                            
-                            IconButton(onClick = {
-                                val intent = Intent(Intent.ACTION_INSERT).apply {
-                                    data = CalendarContract.Events.CONTENT_URI
-                                    putExtra(CalendarContract.Events.TITLE, title)
-                                    putExtra(CalendarContract.Events.EVENT_LOCATION, location)
-                                    putExtra(CalendarContract.Events.DESCRIPTION, "A traditional Karnataka event focusing on $artType.")
-                                    
-                                    try {
-                                        val dateParts = date.split("-").map { it.trim() }
-                                        val firstDateStr = dateParts[0]
-                                        val sdf = java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault())
-                                        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-                                        
-                                        val startDate = sdf.parse(firstDateStr)
-                                        startDate?.let {
-                                            val cal = java.util.Calendar.getInstance()
-                                            cal.time = it
-                                            cal.set(java.util.Calendar.YEAR, currentYear)
-                                            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, cal.timeInMillis)
-                                            
-                                            if (dateParts.size > 1) {
-                                                val endDate = sdf.parse(dateParts[1])
-                                                endDate?.let { end ->
-                                                    cal.time = end
-                                                    cal.set(java.util.Calendar.YEAR, currentYear)
-                                                    putExtra(CalendarContract.EXTRA_EVENT_END_TIME, cal.timeInMillis)
-                                                }
-                                            } else {
-                                                putExtra(CalendarContract.EXTRA_EVENT_END_TIME, cal.timeInMillis + 3600000)
-                                            }
-                                        }
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("EventCard", "Failed to parse date: $date", e)
-                                    }
-                                }
-                                context.startActivity(intent)
-                            }) {
-                                Icon(Icons.Default.CalendarToday, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            }, modifier = Modifier.background(Color.Black.copy(0.05f), CircleShape)) {
+                                Icon(Icons.Default.Share, null, tint = KarnatakaRed, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -168,37 +193,8 @@ fun EventCard(
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            modifier = Modifier.size(32.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            shape = CircleShape
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("📅", fontSize = 14.sp)
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = date,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            modifier = Modifier.size(32.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            shape = CircleShape
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("📍", fontSize = 14.sp)
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Icon(Icons.Default.LocationOn, null, tint = KarnatakaRed.copy(0.6f), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = location,
                             style = MaterialTheme.typography.bodyMedium,
@@ -208,32 +204,61 @@ fun EventCard(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
                             onClick = onViewOnMap,
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = RoundedCornerShape(12.dp)
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = RoundedCornerShape(25.dp),
+                            border = BorderStroke(1.dp, KarnatakaRed.copy(alpha = 0.3f))
                         ) {
-                            Text("View on Map", fontWeight = FontWeight.Bold)
+                            Text("Map View", fontWeight = FontWeight.Bold, color = KarnatakaRed)
                         }
                         
-                        val buttonState = when {
-                            isRegistered -> ButtonState.SUCCESS
-                            isRegistering -> ButtonState.LOADING
-                            else -> ButtonState.IDLE
-                        }
-
-                        MorphingButton(
-                            state = buttonState,
-                            idleText = "Register Interest",
-                            successText = "Registered",
-                            onClick = onRegister,
+                        val registerColor by animateColorAsState(
+                            targetValue = if (isRegistered) Color(0xFF1D9E75) else KarnatakaRed,
+                            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+                            label = "registerColor"
+                        )
+                        
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onRegister()
+                            },
                             modifier = Modifier
                                 .weight(1.5f)
-                                .height(48.dp),
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            successColor = Color(0xFF1D9E75)
-                        )
+                                .height(50.dp)
+                                .graphicsLayer {
+                                    scaleX = if (isRegistering) 0.95f else 1f
+                                    scaleY = if (isRegistering) 0.95f else 1f
+                                },
+                            shape = RoundedCornerShape(25.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = registerColor,
+                                disabledContainerColor = registerColor.copy(alpha = 0.5f)
+                            ),
+                            enabled = !isRegistering
+                        ) {
+                            if (isRegistering) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                            } else {
+                                AnimatedContent(targetState = isRegistered, label = "regIcon") { registered ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            if (registered) Icons.Default.Check else Icons.Default.ConfirmationNumber, 
+                                            null, 
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            if (registered) "JOINED" else "GET PASS", 
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 1.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
