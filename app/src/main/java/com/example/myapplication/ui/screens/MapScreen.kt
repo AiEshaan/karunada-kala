@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,18 +47,22 @@ import com.example.myapplication.ui.model.MapItem
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.ui.theme.KarnatakaRed
 import com.example.myapplication.ui.theme.KarnatakaYellow
+import com.example.myapplication.ui.theme.TempleGreen
 import com.example.myapplication.viewmodel.EventViewModel
 import com.example.myapplication.viewmodel.MapViewModel
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.ui.theme.HeritageCream
 import com.example.myapplication.viewmodel.WorkshopViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
+import kotlinx.coroutines.launch
 
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.android.compose.*
 import com.google.maps.android.compose.clustering.Clustering
 
-@OptIn(MapsComposeExperimentalApi::class)
+@OptIn(MapsComposeExperimentalApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     navController: NavController,
@@ -86,13 +91,13 @@ fun MapScreen(
         }
     }
     val mapItems by mapViewModel.mapItems.collectAsState()
-    val stableItems = remember(mapItems) { mapItems } // Removed .take(50) to allow all items
     val filterType by mapViewModel.selectedFilter.collectAsState()
     val isLoading by mapViewModel.isLoading.collectAsState()
-    val userLocation by mapViewModel.userLocation.collectAsState()
     val nearestItem by mapViewModel.nearestItem.collectAsState()
+    val userLocation by mapViewModel.userLocation.collectAsState()
     
     var selectedItem by remember { mutableStateOf<MapItem?>(null) }
+    var hasDeepLinked by remember { mutableStateOf(false) }
     
     val karnatakaCenter = LatLng(15.3173, 75.7139)
     val cameraPositionState = rememberCameraPositionState {
@@ -107,19 +112,17 @@ fun MapScreen(
         }
     }
 
-    val mapProperties by remember(parchmentMapStyle) {
-        mutableStateOf(
-            MapProperties(
-                isMyLocationEnabled = false, 
-                mapType = MapType.NORMAL,
-                mapStyleOptions = com.google.android.gms.maps.model.MapStyleOptions(parchmentMapStyle)
-            )
+    val mapProperties = remember(parchmentMapStyle) {
+        MapProperties(
+            isMyLocationEnabled = false, 
+            mapType = MapType.NORMAL,
+            mapStyleOptions = MapStyleOptions(parchmentMapStyle)
         )
     }
 
     // Handle deep link or initial position safely
     LaunchedEffect(initialLat, initialLng, mapItems) {
-        if (initialLat != null && initialLng != null && initialLat.isFinite() && initialLng.isFinite()) {
+        if (!hasDeepLinked && initialLat != null && initialLng != null && initialLat.isFinite() && initialLng.isFinite()) {
             val target = LatLng(initialLat, initialLng)
             try {
                 cameraPositionState.animate(
@@ -135,15 +138,7 @@ fun MapScreen(
             }
             if (item != null) {
                 selectedItem = item
-            }
-        } else if (mapItems.isEmpty()) {
-            try {
-                cameraPositionState.animate(
-                    update = CameraUpdateFactory.newLatLngZoom(karnatakaCenter, 7f),
-                    durationMs = 1500
-                )
-            } catch (e: Exception) {
-                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(karnatakaCenter, 7f))
+                hasDeepLinked = true
             }
         }
     }
@@ -165,9 +160,6 @@ fun MapScreen(
         }
     }
     
-    // 💡 Icons moved to be initialized safely inside GoogleMap or using a state that checks for initialization
-    var isMapInitialized by remember { mutableStateOf(false) }
-    
     LaunchedEffect(Unit) {
         mapViewModel.fetchData()
         val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -183,96 +175,107 @@ fun MapScreen(
         showMotion = false,
         overlayBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFdfdfd))
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                LargeTopAppBar(
+                    title = { 
+                        Column {
+                            Text("CULTURAL NETWORK", style = MaterialTheme.typography.labelSmall, letterSpacing = 2.sp, color = KarnatakaRed)
+                            Text("Artisan Map", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = TempleGreen)
+                        }
+                    },
+                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                        titleContentColor = KarnatakaRed
+                    )
+                )
+            }
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = mapProperties,
-            onMapLoaded = { isMapInitialized = true },
             onMapClick = { selectedItem = null },
-            uiSettings = MapUiSettings(zoomControlsEnabled = false)
+            uiSettings = MapUiSettings(
+                zoomControlsEnabled = false,
+                myLocationButtonEnabled = false, // We use our custom one
+                compassEnabled = true
+            )
         ) {
-            // Use stableItems directly. Clustering manages its own state updates internally.
-            // Rapidly swapping the whole Clustering component can cause "Invalid Applier" or SDK race conditions.
-            if (isMapInitialized && stableItems.isNotEmpty()) {
-                Clustering(
-                    items = stableItems,
-                    onClusterItemClick = { item ->
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        selectedItem = item
-                        true
-                    },
-                    clusterItemContent = { item ->
-                        val isDeepLinked = initialLat != null && item.lat == initialLat && item.lng == initialLng
-                        val markerColor = when (item.type) {
-                            "Artists" -> Color(0xFF8B4513)   // Warm brown
-                            "Events" -> KarnatakaRed         // National Pride Red
-                            "Workshops" -> KarnatakaYellow   // National Pride Yellow
-                            else -> Color(0xFF6200EE)
-                        }
-                        val emoji = when (item.type) {
-                            "Artists" -> "🏺"
-                            "Events" -> "🎭"
-                            "Workshops" -> "🎓"
-                            else -> "📍"
-                        }
+            Clustering(
+                items = mapItems,
+                onClusterItemClick = { item ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    selectedItem = item
+                    true
+                },
+                clusterItemContent = { item ->
+                    val isDeepLinked = initialLat != null && item.lat == initialLat && item.lng == initialLng
+                    val markerColor = when (item.type) {
+                        "Artists" -> Color(0xFF8B4513)   // Warm brown
+                        "Events" -> KarnatakaRed         // National Pride Red
+                        "Workshops" -> KarnatakaYellow   // National Pride Yellow
+                        else -> Color(0xFF6200EE)
+                    }
+                    val emoji = when (item.type) {
+                        "Artists" -> "🏺"
+                        "Events" -> "🎭"
+                        "Workshops" -> "🎓"
+                        else -> "📍"
+                    }
 
-                        val isSpecial = isDeepLinked || item.type == "Events"
-                        
-                        com.example.myapplication.ui.components.PulseAnimation(
-                            modifier = Modifier.padding(8.dp)
+                    Surface(
+                        modifier = Modifier.size(if (isDeepLinked) 48.dp else 36.dp),
+                        shape = CircleShape,
+                        color = markerColor,
+                        tonalElevation = if (isDeepLinked) 12.dp else 4.dp,
+                        border = BorderStroke(
+                            if (isDeepLinked) 3.dp else 2.dp,
+                            Color.White
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Surface(
-                                modifier = Modifier.size(if (isDeepLinked) 48.dp else 36.dp),
-                                shape = CircleShape,
-                                color = markerColor,
-                                tonalElevation = if (isDeepLinked) 12.dp else 4.dp,
-                                border = BorderStroke(
-                                    if (isDeepLinked) 3.dp else 2.dp,
-                                    Color.White
-                                )
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(emoji, fontSize = if (isDeepLinked) 20.sp else 14.sp)
-                                }
-                            }
+                            Text(emoji, fontSize = if (isDeepLinked) 20.sp else 14.sp)
                         }
-                    },
-                    clusterContent = { cluster ->
-                        val clusterSize = cluster.items.size
-                        val items = cluster.items
+                    }
+                },
+                clusterContent = { cluster ->
+                    val clusterSize = cluster.items.size
+                    val items = cluster.items
 
-                        Surface(
-                            modifier = Modifier.size(56.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            tonalElevation = 8.dp,
-                            border = BorderStroke(2.dp, Color.White)
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        tonalElevation = 8.dp,
+                        border = BorderStroke(2.dp, Color.White)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = clusterSize.toString(),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (items.any { it.type == "Artists" }) Text("🎭", fontSize = 8.sp)
-                                    if (items.any { it.type == "Events" }) Text("🎪", fontSize = 8.sp)
-                                    if (items.any { it.type == "Workshops" }) Text("🧑‍🏫", fontSize = 8.sp)
-                                }
+                            Text(
+                                text = clusterSize.toString(),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (items.any { it.type == "Artists" }) Text("🎭", fontSize = 8.sp)
+                                if (items.any { it.type == "Events" }) Text("🎪", fontSize = 8.sp)
+                                if (items.any { it.type == "Workshops" }) Text("🧑‍🏫", fontSize = 8.sp)
                             }
                         }
                     }
-                )
-            }
+                }
+            )
         }
 
         // ✨ Emotional Hook Overlay
@@ -362,6 +365,50 @@ fun MapScreen(
             }
         }
 
+        // 🧭 Professional Recenter/Compass FAB
+        val scope = rememberCoroutineScope()
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 100.dp, end = 20.dp)
+        ) {
+            FloatingActionButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    scope.launch {
+                        // 1. Get current location or wait for it
+                        val location = mapViewModel.getUserLocation()
+                        
+                        // 2. Animate Camera to user or fallback to Karnataka center
+                        val target = location?.let { LatLng(it.latitude, it.longitude) } ?: karnatakaCenter
+                        val zoom = if (location != null) 15f else 7f
+                        
+                        cameraPositionState.animate(
+                            update = CameraUpdateFactory.newCameraPosition(
+                                CameraPosition.builder()
+                                    .target(target)
+                                    .zoom(zoom)
+                                    .tilt(0f)
+                                    .bearing(0f)
+                                    .build()
+                            ),
+                            durationMs = 1200
+                        )
+                    }
+                },
+                containerColor = HeritageCream,
+                contentColor = KarnatakaRed,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = "Recenter to My Location",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -448,6 +495,7 @@ fun MapScreen(
                 }
             }
         }
+    }
     }
     }
 }
