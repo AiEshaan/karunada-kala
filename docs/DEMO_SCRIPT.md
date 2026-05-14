@@ -15,6 +15,7 @@
 ### B. The 3D Legend Flip (The "Wow" Factor)
 *   **Action**: Tap an Art Card and perform the **3D Flip**.
 *   **Highlight**: "This is the 3D Legend Card. It mimics the unrolling of an ancient scroll. When flipped, Gemini generates a personalized legend for that specific art form."
+*   **AI Narrative Deep-Dive**: "We've implemented **Evocative AI Narratives**. For iconic arts like **Yakshagana** or **Kinnala Toys**, the AI doesn't just give facts; it weaves a 'National Pride' story that connects the craft to the Vijayanagara Empire or coastal traditions, making the experience deeply personal."
 
 ### C. The Artisan Map (The Utility)
 *   **Action**: Switch to the Map Tab.

@@ -30,9 +30,12 @@ import coil.compose.AsyncImage
 import com.example.myapplication.ui.components.KalaFilterChip
 import com.example.myapplication.ui.navigation.NavRoutes
 import com.example.myapplication.viewmodel.EventViewModel
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.ui.components.AppBackgroundContainer
+import com.example.myapplication.ui.theme.HeritageCream
+import com.example.myapplication.ui.theme.KarnatakaRed
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
@@ -57,11 +60,57 @@ fun EventDetailScreen(
     val isRegistered = registrationStatus[title] ?: false
     val isRegistering by viewModel.isRegistering.collectAsState()
     val trimmedImageUrl = imageUrl.trim()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     AppBackgroundContainer(textureAlpha = 0.03f) {
         Scaffold(
             containerColor = Color.Transparent,
-        bottomBar = {
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = {
+                LargeTopAppBar(
+                    title = {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    },
+                    scrollBehavior = scrollBehavior,
+                    navigationIcon = {
+                        IconButton(onClick = { navController.navigateUp() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            val intent = Intent(Intent.ACTION_INSERT).apply {
+                                data = CalendarContract.Events.CONTENT_URI
+                                putExtra(CalendarContract.Events.TITLE, title)
+                                putExtra(CalendarContract.Events.EVENT_LOCATION, location)
+                            }
+                            context.startActivity(intent)
+                        }) {
+                            Icon(Icons.Default.CalendarToday, contentDescription = "Add to Calendar")
+                        }
+                        IconButton(onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, "Join me for $title, a $artType event in Karnataka! Discover more on Karunada Kala.")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share Event"))
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share")
+                        }
+                    },
+                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                        titleContentColor = KarnatakaRed,
+                        navigationIconContentColor = KarnatakaRed,
+                        actionIconContentColor = KarnatakaRed
+                    )
+                )
+            },
+            bottomBar = {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 tonalElevation = 8.dp,
@@ -127,11 +176,11 @@ fun EventDetailScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = padding.calculateBottomPadding())
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
             // Hero Image
-            Box(modifier = Modifier.fillMaxWidth().height(350.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
                 AsyncImage(
                     model = trimmedImageUrl,
                     contentDescription = title,
@@ -146,19 +195,10 @@ fun EventDetailScreen(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
-                                startY = 300f
+                                startY = 200f
                             )
                         )
                 )
-                
-                IconButton(
-                    onClick = { navController.popBackStack() },
-                    modifier = Modifier
-                        .padding(top = 48.dp, start = 16.dp)
-                        .background(Color.Black.copy(alpha = 0.3f), CircleShape)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
-                }
 
                 Column(
                     modifier = Modifier
@@ -171,30 +211,6 @@ fun EventDetailScreen(
                         label = artType,
                         icon = "✨"
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = Color.White,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-                
-                IconButton(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_INSERT).apply {
-                            data = CalendarContract.Events.CONTENT_URI
-                            putExtra(CalendarContract.Events.TITLE, title)
-                            putExtra(CalendarContract.Events.EVENT_LOCATION, location)
-                        }
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 48.dp, end = 16.dp)
-                        .background(Color.Black.copy(alpha = 0.3f), CircleShape)
-                ) {
-                    Icon(Icons.Default.CalendarToday, null, tint = Color.White)
                 }
             }
 

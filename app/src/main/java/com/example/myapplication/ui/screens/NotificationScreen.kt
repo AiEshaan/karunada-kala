@@ -25,6 +25,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.myapplication.data.model.AppNotification
 import com.example.myapplication.data.repository.NotificationRepository
+import com.example.myapplication.ui.theme.HeritageCream
+import com.example.myapplication.ui.theme.KarnatakaRed
+import com.example.myapplication.ui.theme.TempleGreen
+import com.example.myapplication.ui.components.AppBackgroundContainer
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,34 +38,48 @@ fun NotificationScreen(navController: NavController) {
     val repository = remember { NotificationRepository(context) }
     val notifications by repository.notifications.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("NOTIFICATIONS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, letterSpacing = 2.sp) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
-            )
-        }
-    ) { padding ->
-        if (notifications.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🔔", fontSize = 64.sp)
-                    Spacer(Modifier.height(16.dp))
-                    Text("No updates yet", style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
-                }
+    AppBackgroundContainer(textureAlpha = 0.03f) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                LargeTopAppBar(
+                    title = { 
+                        Column {
+                            Text("UPDATES", style = MaterialTheme.typography.labelSmall, letterSpacing = 2.sp, color = KarnatakaRed)
+                            Text("Notifications", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = TempleGreen)
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.navigateUp() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                    colors = TopAppBarDefaults.largeTopAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                        titleContentColor = KarnatakaRed,
+                        navigationIconContentColor = KarnatakaRed
+                    )
+                )
             }
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-                items(notifications, key = { it.id }) { notification ->
-                    NotificationItem(notification) {
-                        scope.launch { repository.markAsRead(notification.id) }
+        ) { padding ->
+            if (notifications.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("🔔", fontSize = 64.sp)
+                        Spacer(Modifier.height(16.dp))
+                        Text("No updates yet", style = MaterialTheme.typography.bodyLarge, color = Color.Gray)
+                    }
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    items(notifications, key = { it.id }) { notification ->
+                        NotificationItem(notification) {
+                            scope.launch { repository.markAsRead(notification.id) }
+                        }
                     }
                 }
             }

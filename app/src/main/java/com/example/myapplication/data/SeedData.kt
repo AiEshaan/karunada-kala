@@ -33,7 +33,7 @@ object SeedData {
         val arts = listOf(
             ArtForm(
                 name = "Yakshagana",
-                description = "The heartbeat of coastal Karnataka, a vibrant theatrical art combining elaborate costume, dance, and music.",
+                description = "A magnificent traditional theatre form of Karnataka that blends dance, music, dialogue, and stunning costumes. It brings ancient epics to life with vibrant energy and rhythmic perfection, serving as the soul of coastal Karnataka's cultural expression.",
                 category = "Performing Arts",
                 imageUrl = "https://images.unsplash.com/photo-1628155930542-3c7a64e2c833",
                 artistName = "Keshava Hegde",
@@ -41,6 +41,16 @@ object SeedData {
                 viewCount = 1250,
                 audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
                 videoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+            ),
+            ArtForm(
+                name = "Kinnala Toys",
+                description = "The royal heritage of Koppal, Kinnala toys are exquisite handcrafted wooden wonders known for their 'Lajja' work. These toys, often depicting deities and rural life, are made using special paste and gold foil, representing a 400-year-old legacy of the Vijayanagara Empire.",
+                category = "Craft",
+                imageUrl = "https://images.pexels.com/photos/161154/doll-toy-handmade-traditional-161154.jpeg",
+                artistName = "Radha Krishna",
+                artistId = "radha_krishna",
+                viewCount = 1420,
+                audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"
             ),
             ArtForm(
                 name = "Dollu Kunitha",
@@ -142,6 +152,7 @@ object SeedData {
     private suspend fun seedArtists() {
         val artists = listOf(
             Artist(name = "Keshava Hegde", artType = "Yakshagana", bio = "A legendary Yakshagana artist with over 40 years of experience in coastal theater.", phone = "9876543210", lat = 13.0, lng = 75.0, city = "Sirsi", experienceYears = 40),
+            Artist(name = "Radha Krishna", artType = "Kinnala Toys", bio = "A master craftsman from Koppal specializing in the intricate 'Lajja' gold-leaf work of Kinnala.", phone = "9123488776", lat = 15.35, lng = 76.15, city = "Koppal", experienceYears = 32),
             Artist(name = "Narasimhaiah", artType = "Dollu Kunitha", bio = "Master of the Dollu drum, keeping the rhythmic heartbeat of rural Karnataka alive.", phone = "9123456789", lat = 12.5, lng = 76.8, city = "Tumkur", experienceYears = 28),
             Artist(name = "Belagal Veeranna", artType = "Togalu Gombeyaata", bio = "National award winner dedicated to preserving the ancient art of leather shadow puppetry.", phone = "9887766554", lat = 15.0, lng = 76.0, city = "Bellary", experienceYears = 35),
             Artist(name = "Ibrahim Sait", artType = "Channapatna Toys", bio = "A veteran toy-maker ensuring that the tradition of lacquered wood remains organic and safe.", phone = "9765432109", lat = 12.65, lng = 77.2, city = "Channapatna", experienceYears = 30),

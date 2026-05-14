@@ -87,16 +87,26 @@ fun MyJourneyScreen(
             topBar = {
                 LargeTopAppBar(
                     title = { 
-                        Text(
-                            "MY JOURNEY", 
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 2.sp
-                        ) 
+                        Column {
+                            Text(
+                                "MY JOURNEY", 
+                                style = MaterialTheme.typography.labelSmall,
+                                letterSpacing = 2.sp,
+                                fontWeight = FontWeight.Black,
+                                color = KarnatakaRed
+                            )
+                            Text(
+                                "Cultural Milestone",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = TempleGreen,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.largeTopAppBarColors(
-                        containerColor = Color.Transparent
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
+                        titleContentColor = KarnatakaRed
                     )
                 )
             }

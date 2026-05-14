@@ -127,7 +127,7 @@ fun DetailScreen(
                     title = { Text(name, style = MaterialTheme.typography.headlineMedium) },
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
+                        IconButton(onClick = { navController.navigateUp() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },

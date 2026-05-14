@@ -31,6 +31,7 @@ import androidx.core.content.edit
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -208,6 +209,7 @@ fun KarunadaKalaApp() {
                         val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
                         ArtistDetailScreen(
                             artistId = artistId,
+                            navController = navController,
                             sharedTransitionScope = this@SharedTransitionLayout,
                             animatedVisibilityScope = this@composable
                         )
@@ -238,6 +240,20 @@ fun KarunadaKalaApp() {
                     }
                     composable(NavRoutes.Notifications.route) {
                         NotificationScreen(navController = navController)
+                    }
+                    composable(NavRoutes.Login.route) {
+                        LoginScreen(
+                            navController = navController,
+                            onLoginSuccess = { navController.navigate(NavRoutes.Explore.route) { popUpTo(0) } },
+                            onNavigateToSignUp = { navController.navigate(NavRoutes.SignUp.route) }
+                        )
+                    }
+                    composable(NavRoutes.SignUp.route) {
+                        SignUpScreen(
+                            navController = navController,
+                            onSignUpSuccess = { navController.navigate(NavRoutes.Explore.route) { popUpTo(0) } },
+                            onNavigateToLogin = { navController.navigate(NavRoutes.Login.route) }
+                        )
                     }
                     composable(
                         route = NavRoutes.WorkshopRegistration.route,
@@ -338,14 +354,18 @@ fun AnimatedBottomBar(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    if (!isSelected) {
-                                        navController.navigate(route.route) {
-                                            popUpTo(navController.graph.startDestinationId) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
+                                    navController.navigate(route.route) {
+                                        // Pop up to the start destination of the graph to
+                                        // avoid building up a large stack of destinations
+                                        // on the back stack as users select items
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
                                         }
+                                        // Avoid multiple copies of the same destination when
+                                        // reselecting the same item
+                                        launchSingleTop = true
+                                        // Restore state when reselecting a previously selected item
+                                        restoreState = true
                                     }
                                 },
                             contentAlignment = Alignment.Center

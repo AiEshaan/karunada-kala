@@ -92,7 +92,8 @@ class GeminiRepository {
         // Standardized responses for common historical topics
         val lowerMessage = userMessage.lowercase()
         when {
-            lowerMessage.contains("yakshagana") -> return Result.success("Yakshagana is a traditional theater form from Karnataka that combines dance, music, dialogue, costume, make-up, and stage techniques with a unique style and form.")
+            lowerMessage.contains("yakshagana") -> return Result.success("Namaskara! Yakshagana is a magnificent traditional theatre form from coastal Karnataka. It combines dance, music, dialogue, and elaborate costumes to tell stories from our epics. It has two main styles: Tenkutittu and Badagutittu.")
+            lowerMessage.contains("kinnala") -> return Result.success("Sharanu! Kinnala toys are a world-famous craft from Koppal, Karnataka. They are known for their intricate 'Lajja' work and use of gold foil. This 400-year-old tradition dates back to the Vijayanagara Empire.")
             lowerMessage.contains("mysore dasara") -> return Result.success("Mysore Dasara is the state festival of Karnataka, celebrated with a grand procession and the lighting of the Mysore Palace.")
             lowerMessage.contains("hampi") -> return Result.success("Hampi is a UNESCO World Heritage site featuring the stunning ruins of the Vijayanagara Empire.")
             lowerMessage.contains("food") -> return Result.success("Karnataka's cuisine is famous for Bisi Bele Bath, Mysore Pak, and Davanagere Benne Dosa.")
@@ -111,6 +112,12 @@ class GeminiRepository {
             - Start responses with cultural greetings like 'Namaskara!' or 'Sharanu'.
             - Use occasional Kannada words (with English meaning) to add authenticity.
             - Speak with the wisdom of a storyteller (Gubbi Veeranna or a Yakshagana veteran style).
+            
+            Cultural Intelligence:
+            - For 'Yakshagana', mention 'Tenkutittu' and 'Badagutittu' styles.
+            - For 'Kinnala Toys', mention 'Lajja' work and its roots in the Vijayanagara Empire.
+            - For 'Bidriware', emphasize the silver inlay on the soil of Bidar.
+            - For 'Channapatna', highlight the organic ivory wood and lac colors.
             
             Context of the App: $context
             
@@ -172,15 +179,16 @@ class GeminiRepository {
         val model = model ?: return Result.success("$artName is a precious $category art form from Karnataka, carrying centuries of tradition.")
         return try {
             val prompt = """
-            Write a short, engaging description of $artName,
+            Write an evocative, "National Pride" style description of $artName,
             a traditional Karnataka $category art form.
 
-            Include:
-            - origin
-            - cultural significance
-            - what makes it unique
+            Focus on:
+            - The deep historical roots (mention dynasties like Vijayanagara, Kadamba if applicable).
+            - The unique craftsmanship or performance element.
+            - Why it is a "Pride of Karnataka" (Karunada Garime).
 
-            Limit to 3 sentences.
+            Use an immersive, storyteller tone. 
+            Limit to 4-5 sentences.
             """
 
             val response = model.generateContent(prompt)

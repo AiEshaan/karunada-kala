@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Chat
@@ -34,6 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.myapplication.ui.components.GyroParallaxHero
@@ -48,6 +50,7 @@ import com.example.myapplication.ui.components.bouncyClickable
 @Composable
 fun ArtistDetailScreen(
     artistId: String,
+    navController: NavController,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope
 ) {
@@ -98,6 +101,11 @@ fun ArtistDetailScreen(
                             LargeTopAppBar(
                                 title = { Text(currentArtist.name, style = MaterialTheme.typography.headlineMedium) },
                                 scrollBehavior = scrollBehavior,
+                                navigationIcon = {
+                                    IconButton(onClick = { navController.navigateUp() }) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                    }
+                                },
                                 colors = TopAppBarDefaults.largeTopAppBarColors(
                                     containerColor = Color.Transparent,
                                     scrolledContainerColor = HeritageCream.copy(alpha = 0.95f),
