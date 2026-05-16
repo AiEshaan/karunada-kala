@@ -5,7 +5,6 @@ import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.request.CachePolicy
-import coil.util.DebugLogger
 import com.google.android.gms.maps.MapsInitializer
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -19,7 +18,7 @@ class KarunadaKalaApplication : Application(), ImageLoaderFactory {
         // Initialize Firebase
         FirebaseApp.initializeApp(this)
         
-        // Initialize Google Maps SDK to prevent IBitmapDescriptorFactory not initialized crash
+        // Initialize Google Maps SDK
         MapsInitializer.initialize(this, MapsInitializer.Renderer.LATEST) { renderer ->
             when (renderer) {
                 MapsInitializer.Renderer.LATEST -> Log.d("MapsInit", "The latest version of the renderer is used.")
@@ -27,7 +26,7 @@ class KarunadaKalaApplication : Application(), ImageLoaderFactory {
             }
         }
         
-        // Enable Firestore Offline Persistence for a "Pass" like experience
+        // Enable Firestore Offline Persistence
         val settings = FirebaseFirestoreSettings.Builder()
             .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
             .build()
@@ -47,10 +46,10 @@ class KarunadaKalaApplication : Application(), ImageLoaderFactory {
                     }
                     .build()
             }
-            .crossfade(600) // Slightly longer for premium feel
+            .crossfade(600)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
-            .respectCacheHeaders(false) // Cache images even if headers say otherwise (good for art images)
+            .respectCacheHeaders(false)
             .build()
     }
 }

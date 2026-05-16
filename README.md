@@ -46,12 +46,11 @@ The project is built on **MVVM (Model-View-ViewModel)** architecture, ensuring s
   <tr>
     <td align="center"><b>Onboarding</b><br><img src="screenshots/onboarding.png" width="200"></td>
     <td align="center"><b>Explore</b><br><img src="screenshots/explore.png" width="200"></td>
-    <td align="center"><b>Map</b><br><img src="screenshots/map.png" width="200"></td>
+    <td align="center"><b>Map</b><br><img src="screenshots/map.jpeg" width="200"></td>
   </tr>
   <tr>
     <td align="center"><b>Events</b><br><img src="screenshots/events.png" width="200"></td>
-    <td align="center"><b>Chronicles</b><br><img src="screenshots/chronicles.png" width="200"></td>
-    <td align="center"><b>Journey</b><br><img src="screenshots/journey.png" width="200"></td>
+    <td align="center"><b>Chronicles</b><br><img src="screenshots/chronicles.jpeg" width="200"></td>
   </tr>
 </table>
 
